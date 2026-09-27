@@ -20,7 +20,7 @@ class AccessTests(unittest.TestCase):
         self.assertEqual(GRAPH.validate(REGISTRY), [])
         key = next(iter(GRAPH.checks))
         incomplete = rules.AccessGraph(GRAPH.entrances,
-                                       {k: v for k, v in GRAPH.checks.items() if k != key})
+                                       {k: v for k, v in GRAPH.checks.items() if k != key}, events=GRAPH.events)
         self.assertEqual(incomplete.validate(REGISTRY, require_complete=False), [key])
         with self.assertRaisesRegex(ValueError, "Access audit incomplete"):
             incomplete.validate(REGISTRY)
@@ -218,7 +218,8 @@ class AccessTests(unittest.TestCase):
     def test_native_quest_inputs_are_separate_from_checks_and_combat_strength(self):
         routes = {"Padlock Key": 1}
         self.assertNotIn("leighs_call_ring", GRAPH.reachable(routes)[1])
-        self.assertIn("leighs_call_ring", GRAPH.reachable({**routes, "Phone": 1})[1])
+        calendar = {"Simple Keys (3)": 9, "Rose": 1, "Basement Key": 1}
+        self.assertIn("leighs_call_ring", GRAPH.reachable({**routes, **calendar, "Phone": 1})[1])
         self.assertNotIn("map016_event003_quest_item", GRAPH.reachable(routes)[1])
         self.assertIn("map016_event003_quest_item", GRAPH.reachable({**routes, "Basement Key": 1})[1])
         floor_one = {**routes, "Apt. 21 Key": 1}
@@ -239,9 +240,11 @@ class AccessTests(unittest.TestCase):
         self.assertNotIn("Laundry", elevator)
 
     def test_home_conversation_check_does_not_require_the_later_vending_purchase(self):
+        calendar = {"Simple Keys (3)": 9, "Padlock Key": 1, "Basement Key": 1, "Rose": 1,
+                    "Phone": 1, "Apt. 21 Key": 1}
         self.assertTrue({"map006_event025_quest_pickup", "roach_leadership_crown",
                          "roach_leadership_sash", "pierre_clown_wig", "boss_drop_707_366"}
-                        <= GRAPH.reachable({})[1])
+                        <= GRAPH.reachable(calendar)[1])
 
     def test_tomb_needs_crossword_access_and_charan_needs_rose(self):
         routes = {"Elevator Access": 1, "Power Restored": 1, "Pluto Disc": 1}
@@ -249,7 +252,7 @@ class AccessTests(unittest.TestCase):
         self.assertIn("wilhelmina_reward_sword", GRAPH.reachable({**routes, "Apt. 21 Key": 1})[1])
         for key in ("map339_event012", "map401_event007_quest_item"):
             self.assertNotIn(key, GRAPH.reachable(routes)[1])
-            self.assertIn(key, GRAPH.reachable({**routes, "Rose": 1})[1])
+            self.assertIn(key, GRAPH.reachable({**routes, "Rose": 1, "Simple Keys (3)": 9})[1])
 
     def test_fourth_floor_and_landlord_use_local_ticket_coins_and_herbicide(self):
         checks = GRAPH.reachable({"Elevator Access": 1, "Power Restored": 1})[1]

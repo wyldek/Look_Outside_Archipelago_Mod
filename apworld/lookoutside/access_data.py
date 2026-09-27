@@ -1,11 +1,12 @@
-"""First reviewed building routes; see docs/access_logic.md for outstanding work.
+"""Reviewed building routes and calendar reservations; see docs/access_logic.md.
 
 Page and command numbers are zero based. No rule measures combat capability.
 Powered routes use permanent AP restoration so generation does not depend on
 finishing a route before the native outage. Earlier access remains possible.
 """
 
-from .access import AccessGraph, Check, Entrance, FREE, all_of, any_of, item, region
+from .access import AccessGraph, Check, Entrance, FREE, all_of, any_of, event, item, region
+from .chronology import EVENTS, CHARAN_CAVE_READY, LEIGH_READY, day
 from .disc_rules import sums
 
 
@@ -40,13 +41,13 @@ ENTRANCES = (
     Entrance("Menu", "Apartment 33", FREE, "Map003 event9 page0 command40 exits home; no AP prerequisite"),
     Entrance("Apartment 33", "Floor 3", FREE, "Map003 event9 page0 command40 -> Map006"),
     Entrance("Floor 3", "Apartment 36", FREE, "Map006 event9 page0 command0 -> Map023"),
-    Entrance("Floor 3", "Original Teeth Apartment", FREE,
+    Entrance("Floor 3", "Original Teeth Apartment", day(1),
              "Map006 event7 pages1-3 -> Map031 -> Maps032/033/034; eight timed pickups are excluded from progression"),
-    Entrance("Floor 3", "Late Teeth Apartment", FREE,
-             "Map006 event7 page10 opens Map435 on Day9 without AP items; -> Maps436/408; calendar advancement is player controlled"),
-    Entrance("Floor 3", "Apartment 31", FREE,
+    Entrance("Floor 3", "Late Teeth Apartment", day(8),
+             "Map006 e29 c40-44 clears1062 on Day8 from06:00; e7 p7 sets selfB and p9 enters435; p10 guarantees entry Day9; ->436/408"),
+    Entrance("Floor 3", "Apartment 31", day(2),
              "Map006 event2 Day2 -> Map108 when lit or Map265 when dark; both have doors to Maps109/110; temporary shadow blocks clear locally"),
-    Entrance("Floor 3", "Taxidermy Apartment", FREE,
+    Entrance("Floor 3", "Taxidermy Apartment", day(4),
              "Map006 event8 page1 opens Map270 on Day4; unrestricted internal doors to Maps276/277/278"),
     Entrance("Taxidermy Apartment", "Flesh Taxidermy Apartment", item("Shrunken Head"),
              "Map276 event2 consumes item378 to open selfA -> Map279 -> Map282; event1 sets694 and opens Map280/281/283/284"),
@@ -159,8 +160,8 @@ ENTRANCES = (
              "Map108 event17 sets local darkness223=0 even with power on; Map111 event2 -> Map269 -> Map268 -> Map267; alternative Map265/266 route"),
     Entrance("Flesh Home", "Unlabeled Game", all_of(item("Unlabeled Cartridge"), UNLABELED_LOCKS),
              "Map267 event24 sets660 around CE12 -> CE40 -> Map406; full colored-key budget covers Maps439-450 and their exits to First Head on Map463"),
-    Entrance("Floor 3", "Apartment 32", FREE,
-             "Map006 event33 page3 opens Map353 from Day4; Map353 event2 -> Map355 foyer before its twelve maze locks"),
+    Entrance("Floor 3", "Apartment 32", day(3),
+             "Map006 e83 Day3 or doorway Day3 branches set904=1; e33 p1 sets2 and p2 enters353; p3 guarantees Day4; ->355 foyer before maze locks"),
     Entrance("Floor 1", "Jasper Apartment", item("Jasper's Key"),
              "Map092 event44 local herbicide -> Map105 event13 item384/selfA -> Map344; herbicide door6 -> Map357"),
     Entrance("Jasper Apartment", "Planetarium", FREE,
@@ -180,12 +181,12 @@ ENTRANCES = (
              "Map070 event61 starts362; CE5 advances it hourly; Map047 event9 opens62 after362>=4; native rent stages169 use local coins via CE109, leading through184/182 to130"),
     Entrance("Elevator", "Floor 4", FREE,
              "Map074 event2's Ground->3->1->2 sequence advances817 to4 and offers Floor4 ->313 ->454; native scripted sequence verified without another AP item"),
-    Entrance("Pluto Storage", "Wilhelmina's Tomb", region("Apartment 21"),
+    Entrance("Pluto Storage", "Wilhelmina's Tomb", event("Wilhelmina Crossword Solved"),
              "Map009 event12 gives the vanilla crossword book237; finish it at home beforeDay15 to learn randomized code493; Map080 event1 ->167 ->342 event4 ->169; no guessing or friendly kill required"),
-    Entrance("Basement West", "Charan's Pit", item("Rose"),
-             "Map086 event77 ->272 ->339 before the Day7 earthquake; CE213 ->Troop590 accepts Rose360 and sets680; no combat requirement"),
-    Entrance("Charan's Pit", "Charan's Cave", FREE,
-             "A later real CE6 new day sets677 after680; revisit CE213 before the Day7 earthquake ->400 ->401; this does not promise synthetic days or bypass the native cutoff"),
+    Entrance("Basement West", "Charan's Pit", FREE,
+             "Map086 event77 ->272 ->339 before the Day7 earthquake; reaching the Rose delivery action needs no additional AP item"),
+    Entrance("Charan's Pit", "Charan's Cave", CHARAN_CAVE_READY,
+             "CE6 sets677 after680; reserve cave visit on Day6 after latest Day5 Rose; Map086 e105 closes route on Day7; CE213 ->400 ->401"),
     Entrance("Eye Apartment", "Flesh Central", IRIS_LOCKS,
              "Map099 event18's Stab me choice consumes an Iris Key and sets1071; event21 ->414; local one-way opener1111 reaches415 and the wrapped central hall384"),
     Entrance("Basement West", "Flesh Central", IRIS_LOCKS,
@@ -322,9 +323,10 @@ add("Original Teeth Apartment", "Maps031/032/033/034 fixed pickups before the Da
     "map033_event007_baseball_cap", "map034_event019", "map034_event025_tank_top")
 add("Original Teeth Apartment", "Map034 event24 safe; deadline makes this filler-only even with the key budget",
     "map034_event024_complex", rule=ORDINARY_LOCK)
-add("Late Teeth Apartment", "Clint/Joel/Benjamin/Madison resolution hooks reconcile early rewards through their permanent Map435 forms",
+add("Floor 3", "Clint on Map006 e27 from Day1; Joel/Benjamin/Madison in original rooms have audited hostile and peaceful resolutions; Map435 forms remain alternatives",
     "clint_rags", "clint_tooth_knife", "joel_peaceful_door_knob", "joel_resolution_toothy_whip",
-    "benjamin_game", "benjamin_pendant", "madison_tooth_hammer")
+    "benjamin_game", "benjamin_pendant", "madison_tooth_hammer",
+    rule=any_of(region("Original Teeth Apartment"), region("Late Teeth Apartment")))
 add("Late Teeth Apartment", "Map435 event6 -> Map408; events7/8/9 -> Map436; equipment pickups have no item requirement",
     "map408_event010", "map436_event008", "map436_event010", "map436_event011")
 add("Apartment 31", "Map108/265 events4/5 -> Map110/109 in either lighting state; all three fixed pickups are unrestricted",
@@ -410,28 +412,30 @@ add("Boiler Maze", "Eight arm encounters in Maps189/193/195/243/246/251/257/258 
 add("Boiler Maze", "Map198 -> Map201 -> Map251 -> Map252 events14/15 -> Map258 event17 safe",
     "map258_event017_safe_104", rule=ORDINARY_LOCK)
 
-# These schedules describe opportunities during the native fifteen days.
-# They never promise extra quest cycles after the cap. The generic ending can
-# release missed checks; see docs/ending_release.md. Local recruiting/training
-# and consumables remain player actions, without combat capability predicates.
+# Calendar events reserve a prompt route; they never add native quest cycles.
+# Ending release rescues player-caused misses, not inherently late placements.
+# Local recruiting/training and supplies have no combat capability predicates.
 add("Apartment 33", "Map004 event20/Troop279 recruits the bathroom roaches; CE6 advances899 through1/3/5 after home conversations; Map003 event121 reconciles all leadership choices",
     "roach_leadership_crown", "roach_leadership_sash")
-add("Apartment 33", "Native Troop60 visitor recruits Monty/Xaria; CE6 advances213 and resets400; template Map002 event48 resolves the seventh conversation's card trick at638, before the powered vending machine",
-    "map006_event025_quest_pickup")
+add("Apartment 33", "Native visitor recruitment plus two CE6 increments of213 and six resets of400; Map002 e48 seventh conversation c638 earliest Day9 but visitor order can delay it; reserve Day15 to keep deadline prerequisites out",
+    "map006_event025_quest_pickup", rule=day(15))
 add("Floor 2", "Map007 event13 and other native shadow rooms use CE54 spawning and Troop18; real new days advance150; Map006 event40 reconciles the doorstep gift, independent of relationship-dependent item choice",
-    "shadow_tongue", "map006_event040_complex", "map006_event040_quest_item")
+    "shadow_tongue", "map006_event040_complex", "map006_event040_quest_item",
+    # Charan's reservation guarantees this route by Day5; allow three new days
+    # for the shared gift resolution. Earlier native checks still work normally.
+    rule=day(8))
 add("Apartment 32", "Map353 event6 enters356 for Pierre; native home/sleep/hour events advance617 and621; final conversation, victory, or final retreat reconciles all three rewards without an AP input",
     "pierre_clown_drawing", "pierre_old_mail", "pierre_clown_wig")
-add("Apartment 32", "Map353 event13 hostile Louis victory sets904=4; CE6 spawns halves, then907/908 after their defeat; events21/19 provide head/torso drops without AP inputs",
-    "boss_drop_707_366", "boss_drop_708_367")
+add("Apartment 32", "Day3 access; Map353 event13 victory sets904=4; two CE6 transitions spawn halves then907/908; events21/19 head/torso drops earliest Day5 without AP inputs",
+    "boss_drop_707_366", "boss_drop_708_367", rule=day(5))
 add("Apartment 36", "Louis' native split quest spawns910; Map023 event57 is before its bedroom locks",
-    "boss_drop_710_368", rule=region("Apartment 32"))
+    "boss_drop_710_368", rule=all_of(region("Apartment 32"), day(5)))
 add("Apartment 37", "Louis' native split quest spawns909; Map035 event28 is before the ordinary locked side room",
-    "boss_drop_709_369", rule=region("Apartment 32"))
+    "boss_drop_709_369", rule=all_of(region("Apartment 32"), day(5)))
 add("Floor 2", "CE3 requires Basement Key to offer Dan's native quest; local Dan recruiting/training stays vanilla; Map007 event58 -> Map015 event2 -> Map016 event3 before the later quest finale",
     "map016_event003_quest_item", rule=item("Basement Key"))
 add("Floor 2", "CE3 consumes Phone389 to start900; CE6/233 and Leigh's native conversations advance it; Map007 event4 ->434 requires900>=20 and Leigh present; CE125 Day15 cutoff stays vanilla",
-    "leighs_call_ring", rule=item("Phone"))
+    "leighs_call_ring", rule=LEIGH_READY)
 add("Basement West", "Map075 event40 opens51 after seven interactions; Map051 event4 unseals430; event16's unconditional page1 supplies the check before Lumpy's optional transformation",
     "map430_event016_quest_pickup")
 add("Floor 1", "Map092 event14 spawns Rat King locally; event45 victory yields the skull and reconciles the crown with or without the native good-luck flag659",
@@ -468,7 +472,7 @@ add("Wilhelmina's Tomb", "Map169 event2 Wordsmith victory reconciles all five mu
     "wilhelmina_reward_sword", "wilhelmina_reward_spear", "wilhelmina_reward_hammer",
     "wilhelmina_reward_gun", "wilhelmina_reward_book")
 add("Charan's Pit", "CE213 returning from Troop590 sets1064 when the Rose gift set680; Map339 event12 now supplies the sword check",
-    "map339_event012")
+    "map339_event012", rule=event("Charan Rose Delivered"))
 add("Charan's Cave", "CE213's goCave branch ->400 ->401 event7; party member only adds dialogue, not an item gate",
     "map401_event007_quest_item")
 add("Boiler Maze", "Map189 events19/32/33/37 execute a native move route on event18 that sets its selfA; hostile and peaceful terminal outcomes reconcile Tickle's drawing",
@@ -481,4 +485,4 @@ add("Floor 3", "Peaceful Sybil resolution: Apt35 Key opens364; bring Telescope P
     "map367_event001_quest_reward", "map348_event005",
     rule=all_of(item("Apt. 35 Key"), item("Telescope Pieces"), region("Ground Lobby")))
 
-GRAPH = AccessGraph(ENTRANCES, CHECKS)
+GRAPH = AccessGraph(ENTRANCES, CHECKS, events=EVENTS)

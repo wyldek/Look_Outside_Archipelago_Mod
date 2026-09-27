@@ -6,7 +6,13 @@ This APWorld supports Normal difficulty. Hard and Easy sessions are rejected.
 Registry **74** provides **273 checks**: 167 equipment copies, 103 physical items and 3 access unlocks.
 All checks have access rules across **74 regions and 81 entrances**,
 with **35 quest-resolution groups**.
+The solver also uses **19 generation-only calendar events**, outside the item pool.
 <!-- END GENERATED REGISTRY SUMMARY -->
+
+New seeds use `chronological_access_v1`, with generation-only calendar events
+for fixed openings and audited deadlines. These reserve a prompt progression
+path without enforcing the runtime clock or the player's choices. Generate a
+new seed to apply the rules; registry74's plugin remains compatible.
 
 Fixed equipment and the reviewed key/collectible sources are randomized.
 Household valuables, crafting materials, consumables, purchases, random loot,

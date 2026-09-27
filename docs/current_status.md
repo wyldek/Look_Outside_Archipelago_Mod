@@ -4,6 +4,11 @@ Registry **74**, game build **74642914**, Normal difficulty, **273 checks/items*
 The pool contains 167 equipment copies, 103 physical items and three access unlocks.
 This document supersedes numerical checkpoints in older audit batch histories.
 
+Generation now uses **`chronological_access_v1`** with **19 addressless calendar
+events**. Regenerate seeds to apply it; registry74's item IDs, plugin, and save
+schema are unchanged. See `calendar_deadlines.md` for the exact event catalog,
+native deadlines, corrected Day3/Day8 openings, and conservative quest waits.
+
 ## Implemented and verified
 
 - APWorld access graph: **273 rules, 74 regions, 81 entrances**, active in generation.
@@ -13,7 +18,11 @@ This document supersedes numerical checkpoints in older audit batch histories.
 - **30 Simple Keys** and **two Black Keys** delivered through the reviewed bundles.
 - Vanilla quest dates/new-day waits, a 4 a.m. hold, and the Day15 home-door fallback.
   Any real ending on any day completes the goal and requests remaining-check release.
-- **36 Python tests and 44 Node tests pass**. Registry signatures and plugin sync pass.
+- **55 Python tests and 44 Node tests pass**. Registry signatures and plugin sync pass.
+- **15 native chronology scenarios** and **10 real AP CollectionState cases**
+  verify boundaries, earlier entrance paths and locked/addressless event handling.
+  AP rejects forced direct and transitive late-Rose placements. Runtime day
+  advancement and ending detection remain unchanged.
 - Save schema7 validates registry/build compatibility before native state loads.
   Older AP schemas are rejected. Compatible queues deliver offline; first binding
   requires reliable fresh-save metadata. See `save_compatibility.md`.
@@ -36,6 +45,8 @@ This document supersedes numerical checkpoints in older audit batch histories.
 
 | Seed | Players | Checks reached without release | Spheres | Evidence |
 | --- | --- | --- | --- | --- |
+| 172 | 1 | 273 / 273 | 10 | Chronology rules active; all19 generation events reachable. |
+| 173 | 2 | 546 / 546 | 20 | Chronology rules active;284 cross-player items;18 excluded filler checks. |
 | 169 | 1 | 273 / 273 | 13 | Live exchange delivered all 273 items, 35 families and Day7 goal confirmation. |
 | 171 | 2 | 546 / 546 | 17 | 266 cross-player items; 18 excluded checks contain filler. Native delayed-Rose/offline-ending release passed. |
 
@@ -43,6 +54,8 @@ Archives are project-local:
 
 - `.local/ap-output/AP_83375365070562934785.zip`
 - `.local/ap-output/AP_88626157643827000401.zip`
+- `.local/ap-output/AP_22016185098783604186.zip`
+- `.local/ap-output/AP_89915537968625953729.zip`
 
 Earlier integrated seeds155–158 passed at 264 checks and seeds159–161 at 267.
 Seeds162–163 passed at 269 checks before adding the car-trunk Shotgun.
@@ -52,8 +65,10 @@ all 546 two-player checks in 12 spheres; seed171 supplied the cross-player Rose 
 Earlier seed154 tests
 also verified online/offline Day15 release and a room with release disabled.
 
-Sphere verification checks real generator placements against the access graph.
-It does not simulate calendar scheduling or a complete walk through the game.
+Sphere verification checks real generator placements against the access graph
+and its calendar reservations. Seeds169/171 predate those reservations and are
+historical protocol evidence. The verifier does not simulate the runtime clock
+or a complete walk through the game.
 Native probes simulate combat outcomes and skip presentation waits.
 
 ## Acquisition report reconciliation
@@ -118,7 +133,9 @@ This must check calendar ordering and presentation in ordinary gameplay;
 automated reachability does not establish that every timed check can be visited
 in one run. Nine locations remain excluded from progression/useful placement.
 Tracked deadline notices, general day warnings and audited ending-choice labels
-are implemented; ending release remains the fallback for expired quests.
+are implemented. Generation must not use release to justify inherently late
+prerequisites; ending release remains recovery for player-caused misses.
+Visitor-order variation and intraday travel time still need full-run verification.
 
 The development package is built with `tools/build_package.py`. Its contents and
 preparation workflow are documented in `package_setup.md`. The installed game

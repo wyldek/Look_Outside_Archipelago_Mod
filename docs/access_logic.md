@@ -1,4 +1,4 @@
-# Access-only generation logic
+# Access and chronological generation logic
 
 ## Confirmed scope
 
@@ -16,8 +16,9 @@ does not apply to randomized keys, whose finite spending budgets are modeled.
 ## Current implementation
 
 `apworld/lookoutside/access.py` supplies item counts, alternatives, conjunctions,
-region prerequisites, a deterministic reachability runner, and an AP rule adapter.
-The validator rejects combat equipment requirements, unknown items/regions,
+region and event prerequisites, a deterministic event/region fixed-point runner,
+and an AP rule adapter. Event dependencies validate separately from randomized
+items. The validator also rejects combat equipment requirements, unknown items/regions,
 impossible item counts, and missing source evidence.
 
 `access_data.py` assigns **all 273 locations** to **74 regions with 81 entrances**.
@@ -44,9 +45,58 @@ python -B tools/audit_access.py --require-complete
 python -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The second command is a passing release gate. With all items, every check is
-reachable; 54 checks require no AP items. These counts describe item access,
-not how many checks can be completed immediately on the first native day.
+The second command is a passing release gate. With all items, every check and
+calendar event is reachable. No-item counts in its output include reachable
+calendar events; they do not count only first-day pickups.
+
+## Chronological safety
+
+`chronology.py` defines **19 generation-only events**: Day1 through Day15, and
+four timed actions. Day0 is the native starting day. Each day requires its
+predecessor. Day5 requires access to the original teeth safe, Day6 requires
+Charan's Rose delivery, Day11 requires Leigh's Phone start, and Day15 requires
+the crossword solution. Actions require their real routes and AP inputs.
+
+The APWorld uses addressless locations with locked, code-less progression items,
+as in [AP's event implementation](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.7/BaseClasses.py#L1234-L1269).
+They add no IDs, pool entries, client packets, or save tracking. There are still
+273 randomized checks and 273 item copies. `event(name)` validates against the
+event catalog; it never treats a synthetic day as a registry item.
+
+Fixed-date entrances open on their verified earliest native dates: original
+teeth Day1, Apartment31 Day2, Apartment32/Kaeley Day3, taxidermy Day4, late teeth
+Day8. The old Day4 Kaeley and Day9 teeth comments described later fallback pages.
+Earlier character resolutions in the original teeth rooms remain alternatives.
+
+Timed actions reserve a safe schedule, rather than simulating the clock. Charan's
+Rose must be available by Day5, leaving a new day for the cave on Day6 before
+the Day7 map-triggered earthquake. Phone must be available by Day10, leaving
+four new days for Leigh's final conversation on Day14 before its Day15 cutoff.
+The cave and Leigh reward receive logical credit on Day6 and Day14 respectively.
+This conservative reservation prevents a multi-day reward from instantly feeding
+an earlier deadline. Native players may collect those rewards earlier.
+
+The original safe retains the nine-bundle key budget, now available by Day4
+before its noon entrance closure. Apartment21/crossword access must exist by
+Day14. Louis's drops need Day5 (Day3 access plus two transitions). Shadow rewards
+are conservatively reserved for Day8: Charan's required route guarantees Floor2
+by Day5, leaving three transitions for the shared doorstep resolution. Juicebox's
+seventh conversation cannot occur before Day9 (first recruit visit, two new days,
+then six conversation cooldown resets). Because visitor order can delay it,
+logic conservatively reserves its check at Day15, excluding it from every
+pre-deadline prerequisite chain. Actual visitor schedules still need playtesting.
+
+Dependencies are transitive. Rose behind a late room blocks Charan's action and
+Day6, which blocks that room. The same cycle appears when Rose is in an early
+room whose key is late. No static `earliest_day` placement filter is used.
+
+The solver's existing Victory event now requires Day15, proving a safe route
+through every reservation to the generic ending even with minimal accessibility.
+**Runtime victory still accepts any real ending on any day.** The player may
+advance days freely; no runtime action is blocked by these synthetic events.
+Generation must not depend on ending release to recover inherently late inputs.
+Release still rescues checks missed through player choice, delays, or error.
+See `calendar_deadlines.md` for exact source evidence and remaining limits.
 
 ## Current quest and Normal-mode findings
 
@@ -187,11 +237,13 @@ and removal of two disconnected valve rooms. See `finite_key_budgets.md`.
 `tools/verify_seed_spheres.py` reads real generated spoiler placements and
 collects only reachable checks before delivering each sphere's items. It checks
 pool quantities, all checks, and filler-only exclusions without using Victory
-or ending release. Seed169 reaches all 273 checks in 13 spheres. Two-player
-seed171 reaches all 546 checks in 17 spheres, with 266 cross-player items and
-18 excluded locations containing filler. Earlier seeds155–168 also passed.
+or ending release. Chronology seed172 reaches all 273 checks in 10 spheres.
+Two-player seed173 reaches all 546 checks in 20 spheres, with 284 cross-player
+items and 18 excluded locations containing filler. The verifier also requires
+all 19 calendar events in each world. Earlier seeds predate chronological rules.
 
-The native Day15 fallback makes AP's completion event reachable without an
-AP item. Consequently goal-only generation success is insufficient evidence;
-the independent all-location sphere check remains required. It does not model
-the native calendar order or replace a complete interactive playthrough.
+AP rejects both forced-invalid fixtures in `tests/fixtures_chronology`: Rose in
+Teeth Tunnel - Jaw Revolver, and Rose in the studio Bottle check with Painter's
+Key in that tunnel. `run_ap_chronology_probe.py` additionally verifies the actual
+CollectionState sweep, locked/addressless event objects and exact boundaries.
+These tests do not replace a complete interactive playthrough.

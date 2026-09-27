@@ -7,7 +7,15 @@ sessions are rejected.
 Registry **74** provides **273 checks**: 167 equipment copies, 103 physical items and 3 access unlocks.
 All checks have access rules across **74 regions and 81 entrances**,
 with **35 quest-resolution groups**.
+The solver also uses **19 generation-only calendar events**, outside the item pool.
 <!-- END GENERATED REGISTRY SUMMARY -->
+
+New seeds use `chronological_access_v1`: generation-only day/action events
+reserve the audited timed progression paths. Rose must be logically available
+by Day5 and Phone by Day10. Native days and quest choices remain player
+controlled. Earlier real endings still win; ending release recovers player-caused
+misses and is not used to justify inherently late placements. Regenerate seeds
+to apply these rules; registry74's plugin and save format remain compatible.
 
 Permanent unlocks include Elevator Access, Planetarium Door Access and Power
 Restored. Starting electricity and the native

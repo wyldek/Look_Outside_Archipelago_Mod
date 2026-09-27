@@ -12,6 +12,12 @@ and releases the remaining checks. Other real endings still count on any day;
 cheat-mode Credits do not. The nine existing filler-only placements remain,
 without adding a blanket exclusion for all timed quests.
 
+Generation-only calendar reservations now prevent the audited inherently late
+prerequisite chains. Ending release is recovery for player choice, delay or error;
+it is not justification for invalid placements. The solver proves the Day15
+fallback route, while runtime completion still accepts earlier real endings.
+See `calendar_deadlines.md`.
+
 ## Client and server behavior
 
 On entering Credits Map168, a bound save records completion. The connected

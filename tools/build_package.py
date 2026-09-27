@@ -33,6 +33,7 @@ def main():
     parser.add_argument("--game-dir", required=True, type=Path, help="Read-only game used for signature validation")
     args = parser.parse_args()
     for command in [["tools/validate_registry.py", "--game-dir", str(args.game_dir)],
+                    ["tools/audit_chronology.py", "--game-dir", str(args.game_dir)],
                     ["tools/sync_plugin_registry.py", "--check"],
                     ["tools/sync_setup_guide.py", "--check"]]:
         subprocess.run([sys.executable, "-B", *command], cwd=PROJECT, check=True)

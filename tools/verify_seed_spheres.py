@@ -3,8 +3,9 @@
 The no-item ending is intentionally insufficient for this check. Starting with
 an empty inventory, collect only reachable locations, then deliver their items.
 This uses the actual generator's spoiler placements and rejects deadlock or
-progression or useful items on explicitly excluded locations. It does not simulate
-the native calendar, choices, movement, or combat.
+progression or useful items on explicitly excluded locations. Each sweep includes
+generation-only calendar reservations. It does not simulate the runtime clock,
+choices, movement, or combat.
 """
 
 import argparse
@@ -80,7 +81,12 @@ def verify(path):
             inventory[recipient][reward] += 1
         checked.update(sphere)
         spheres.append(len(sphere))
+    for player in players:
+        _, _, events = graph.sweep(inventory[player])
+        if events != {entry.name for entry in graph.events}:
+            raise ValueError(f"Seed fails calendar reservations for {player}")
     return {"archive": str(path), "players": len(players), "checked": len(checked), "sphere_sizes": spheres,
+            "generation_events_per_player": len(graph.events),
             "excluded_locations": len(players) * sum(bool(row.get("missable")) for row in locations.values()),
             "cross_player_items": sum(owner != recipient for (owner, _), (recipient, _) in placements.items()),
             "goal_release_used": False}

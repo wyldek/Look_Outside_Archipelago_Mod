@@ -1,0 +1,12 @@
+name: Chronology_Transitive_Rose
+game: Look Outside
+Look Outside:
+  plando_items:
+    - item: Rose
+      location: Floor 1 Studio Apartment - Bottle
+      from_pool: true
+      force: true
+    - item: Painter's Key
+      location: Teeth Tunnel - Jaw Revolver
+      from_pool: true
+      force: true

@@ -76,6 +76,10 @@ async function main() {
         assert.deepEqual(setup, { plugin: true, pageIndex: 0,
             mapId: 23, version: 74642914 });
 
+        if (process.argv[3] === "chronology") {
+            console.log(JSON.stringify(await evaluate(`(${require("../tests/native_chronology_probe").toString()})()`)));
+            return;
+        }
         if (process.argv[3] === "session") {
             console.log(JSON.stringify(await evaluate(`(${require("../tests/native_session_probe").toString()})()`)));
             return;

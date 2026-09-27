@@ -6,7 +6,8 @@ separate game copy; this project's installed Steam directory stays read-only.
 
 ## Run to an ending
 
-- Follow the generated placements through several regions. Confirm pickups
+- Use a newly generated `chronological_access_v1` seed. Follow the generated
+  placements through several regions. Confirm pickups
   send checks while received items arrive independently, including keys held
   by another player. There are no combat equipment requirements in generation.
 - Save, close, restart, and reconnect during progression. Confirm the same seed
@@ -42,6 +43,9 @@ status message without the password. Do not share your original game assets.
 
 The native probes run actual event interpreters and reward code with synthetic
 combat outcomes and skipped presentation waits. Sphere verification evaluates
-the access graph against generated placements, without simulating calendar
-ordering or a full walk through the game. Known timed opportunities retain
-vanilla timing; a completed ending releases their remaining checks.
+the access graph and calendar reservations against generated placements. It
+does not simulate actual clock time or a full walk through the game. Check
+visitor-order variation, especially Monty/Xaria and Juicebox, repeated shadow
+encounters, and prompt travel before intraday cutoffs. Generation must not rely
+on release for inherently late prerequisites; player-caused misses can recover
+through an ending.

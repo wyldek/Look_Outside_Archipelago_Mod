@@ -1,4 +1,4 @@
-"""Look Outside development APWorld with access-only placement rules."""
+"""Look Outside development APWorld with access and chronological placement rules."""
 
 import json
 from importlib import resources
@@ -7,6 +7,7 @@ from BaseClasses import Item, ItemClassification, Location, LocationProgressType
 from worlds.AutoWorld import WebWorld, World
 
 from .access_data import GRAPH
+from .chronology import LOGIC_VERSION, day
 
 
 DATA = json.loads(resources.files(__package__).joinpath("vertical_slice.json").read_text(encoding="utf-8"))
@@ -69,10 +70,17 @@ class LookOutsideWorld(World):
             parent.locations.append(location)
             if entry.get("missable"):
                 location.progress_type = LocationProgressType.EXCLUDED
-        # The native home Day15 ending needs no AP item. This is an intentional
-        # goal fallback, not permission to ignore item/location access rules.
+        for entry in GRAPH.events:
+            location = LookOutsideLocation(self.player, entry.location, None, regions[entry.region])
+            location.access_rule = entry.rule.as_ap_rule(self.player)
+            regions[entry.region].locations.append(location)
+            location.place_locked_item(LookOutsideItem(entry.name, ItemClassification.progression,
+                                                       None, self.player))
+        # Prove a chronology-safe route to the native Day15 fallback. Runtime
+        # goal detection still accepts every real ending on any day. Giving the
+        # solver a free Victory would bypass timed reservations in minimal mode.
         regions["Apartment 33"].add_event("Any Ending", "Victory", location_type=LookOutsideLocation,
-                                        item_type=LookOutsideItem)
+                                        item_type=LookOutsideItem, rule=day(15).as_ap_rule(self.player))
 
     def create_items(self) -> None:
         for entry in DATA["items"]:
@@ -89,7 +97,7 @@ class LookOutsideWorld(World):
         return "Mop"
 
     def set_rules(self) -> None:
-        # Real ending detection stays in the client; no combat or Day15 minimum.
+        # Client endings have no Day15 minimum; generation proves the safe fallback.
         self.multiworld.completion_condition[self.player] = (
             lambda state: state.has("Victory", self.player)
         )
@@ -97,7 +105,7 @@ class LookOutsideWorld(World):
     def fill_slot_data(self) -> dict:
         return {
             "development_slice": True,
-            "access_logic": "access_only_v1",
+            "access_logic": LOGIC_VERSION,
             "difficulty": "normal",
             "registry_version": DATA["registry_version"],
             "audited_game_id": DATA["audited_game_id"],

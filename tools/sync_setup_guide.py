@@ -20,7 +20,8 @@ def summary(registry, graph):
     return (f"Registry **{registry['registry_version']}** provides **{len(registry['locations'])} checks**: "
             f"{equipment} equipment copies, {items} physical items and {unlocks} access unlocks.\n"
             f"All checks have access rules across **{len(graph.regions)} regions and {len(graph.entrances)} entrances**,\n"
-            f"with **{len(registry['quest_families'])} quest-resolution groups**.\n")
+            f"with **{len(registry['quest_families'])} quest-resolution groups**.\n"
+            f"The solver also uses **{len(graph.events)} generation-only calendar events**, outside the item pool.\n")
 
 
 def synchronize(text, registry, graph, check=False):

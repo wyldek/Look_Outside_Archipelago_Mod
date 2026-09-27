@@ -1,0 +1,8 @@
+name: Chronology_Late_Rose
+game: Look Outside
+Look Outside:
+  plando_items:
+    - item: Rose
+      location: Teeth Tunnel - Jaw Revolver
+      from_pool: true
+      force: true

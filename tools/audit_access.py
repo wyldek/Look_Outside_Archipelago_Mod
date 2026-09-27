@@ -27,14 +27,17 @@ def main():
     graph = load_access()
     missing = graph.validate(registry, require_complete=args.require_complete)
     inventory = {entry["name"]: entry["quantity"] for entry in registry["items"]}
-    reached, checks = graph.reachable(inventory)
+    reached, checks, events = graph.sweep(inventory)
     unreachable = sorted(graph.checks.keys() - checks)
     if unreachable:
         raise ValueError(f"Reviewed checks unreachable with every item: {unreachable}")
+    if events != {entry.name for entry in graph.events}:
+        raise ValueError("Generation events unreachable with every item")
     print(json.dumps({
         "combat_logic": "access_only", "active_in_generator": True,
         "reviewed_locations": len(graph.checks), "unreviewed_locations": len(missing),
         "regions": len(graph.regions), "entrances": len(graph.entrances),
+        "generation_events": len(graph.events), "all_events_reachable": len(events) == len(graph.events),
         "reviewed_checks_with_no_items": len(graph.reachable({})[1]),
         "all_items_reaches_every_reviewed_check": True,
     }, indent=2))
