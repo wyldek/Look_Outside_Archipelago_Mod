@@ -44,7 +44,8 @@ def show(label, page, indices=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--game-dir", type=Path, default=Path(r"C:\Games\Steam\steamapps\common\Look Outside"))
+    parser.add_argument("--game-dir", type=Path, required=True,
+                        help="Path to the read-only Look Outside installation")
     parser.add_argument("--map", type=int)
     parser.add_argument("--events", help="Comma-separated event IDs; default all")
     parser.add_argument("--page", type=int)

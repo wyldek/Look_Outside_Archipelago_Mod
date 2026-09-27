@@ -14,10 +14,13 @@ See `docs/save_compatibility.md`.
 
 1. Extract this package into a writable folder. Install Python 3.10 or newer
    if `python --version` is unavailable.
-2. Open PowerShell in that folder and run:
+2. Open PowerShell in that folder and run the following. At the prompt, enter
+   the full path to your Look Outside installation (the folder containing
+   `Game.exe`) without surrounding quotes:
 
    ```powershell
-   python .\prepare_mod.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
+   $gameSource = Read-Host 'Path to your Look Outside installation'
+   python .\prepare_mod.py --game-dir "$gameSource"
    ```
 
    This reads the source game and creates `prepared` beside the package. It

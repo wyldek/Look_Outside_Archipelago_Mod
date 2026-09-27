@@ -38,8 +38,8 @@ physical items, and three virtual access unlocks**. There are 64 distinct items
 classified as progression. That classification does not always mean the item
 gates an AP location; see the [internal item reference](docs/internal_progression_item_limits.md).
 
-The installed game at `C:\Games\Steam\steamapps\common\Look Outside` and
-Archipelago at `C:\ProgramData\Archipelago` are treated as **read-only sources**.
+Your installed Look Outside and Archipelago folders are treated as
+**read-only sources**. Their locations are supplied during setup.
 All working copies, saves, profiles, generated seeds, and build outputs belong
 inside this project. Game assets are not distributed with the mod.
 
@@ -240,11 +240,11 @@ goal still counts, but remaining checks need a host permission change. See
 
 ### 1. Requirements
 
-- A matching Windows game installation and Archipelago installation. These
-  steps use the read-only source paths listed above.
+- A matching Windows game installation and Archipelago installation. You will
+  enter their folder paths during setup; the originals remain read-only.
 - Python **3.10 or newer**, available as `python` in PowerShell.
-- This repository in `C:\dev\Look_Outside_Archipelago_Mod` (adjust as needed),
-  with space for copies of both installations.
+- A local checkout of this repository in a writable folder, with space for
+  copies of both installations.
 - A fresh **Normal** game and a seed generated with the current APWorld.
 
 This mod adds `js/plugins/LookOutsideArchipelago.js` and registers it in a
@@ -253,15 +253,19 @@ external AP bridge client to launch; the game plugin connects to the AP server.
 
 ### 2. Stage the game and APWorld inside the project
 
-Run from PowerShell:
+Open PowerShell in the repository root (the folder containing this README),
+then run the following. At each prompt, enter the full folder path without
+surrounding quotes. The game folder must contain `Game.exe`; the Archipelago
+folder must contain `ArchipelagoGenerate.exe`.
 
 ```powershell
-Set-Location 'C:\dev\Look_Outside_Archipelago_Mod'
 $projectRoot = (Get-Location).Path
-python -B tools/validate_registry.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
+$gameSource = Read-Host 'Path to your Look Outside installation'
+$apSource = Read-Host 'Path to your Archipelago installation'
+python -B tools/validate_registry.py --game-dir "$gameSource"
 python -B tools/sync_plugin_registry.py --check
-python -B tools/stage_game.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
-python -B tools/stage_archipelago.py --ap-dir 'C:\ProgramData\Archipelago'
+python -B tools/stage_game.py --game-dir "$gameSource"
+python -B tools/stage_archipelago.py --ap-dir "$apSource"
 ```
 
 This creates `.local/game-smoke` and `.local/archipelago-smoke`. The game copy
@@ -271,11 +275,12 @@ The development game copy suppresses Steam achievement/stat writes during
 testing; that instrumentation is absent from the distributable plugin.
 
 If these staged directories already exist, close their game/generator processes
-and use the matching refresh flag instead of the initial staging command:
+and use the matching refresh flag instead of the initial staging command.
+Run from the repository root with `$gameSource` and `$apSource` set as above:
 
 ```powershell
-python -B tools/stage_game.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside' --refresh-plugin
-python -B tools/stage_archipelago.py --ap-dir 'C:\ProgramData\Archipelago' --refresh-world
+python -B tools/stage_game.py --game-dir "$gameSource" --refresh-plugin
+python -B tools/stage_archipelago.py --ap-dir "$apSource" --refresh-world
 ```
 
 Refresh updates the mod component, not the underlying installation. After an
@@ -313,11 +318,11 @@ world listings during development, but its YAML works.
 
 Extract the generated ZIP from `.local/playtest-output` into a new project-local
 folder, for example `.local/hosted-seed`. Find its `.archipelago` multidata file.
-In a separate PowerShell terminal, run the following, replacing `AP_<seed>` with
-the actual filename:
+Open a separate PowerShell terminal in the repository root and run the following,
+replacing `AP_<seed>` with the actual filename:
 
 ```powershell
-$projectRoot = 'C:\dev\Look_Outside_Archipelago_Mod'
+$projectRoot = (Get-Location).Path
 Set-Location "$projectRoot\.local\archipelago-smoke"
 .\ArchipelagoServer.exe "$projectRoot\.local\hosted-seed\AP_<seed>.archipelago" --host 127.0.0.1 --port 38281 --release_mode goal --collect_mode disabled
 ```
@@ -330,10 +335,10 @@ ensure its host permits release. The generator needs the custom APWorld.
 
 ### 5. Launch and connect
 
-In another PowerShell terminal:
+Open another PowerShell terminal in the repository root:
 
 ```powershell
-$projectRoot = 'C:\dev\Look_Outside_Archipelago_Mod'
+$projectRoot = (Get-Location).Path
 $env:LOA_DEV_MODE = '1'
 Set-Location "$projectRoot\.local\game-smoke"
 .\Game.exe --user-data-dir="$projectRoot\.local\nw-profile"
@@ -359,11 +364,11 @@ the client still require a server connection.
 ### Optional: build and install an extracted package
 
 The staging workflow above runs directly from this checkout. To prepare the
-distributable files instead:
+distributable files instead, run from the repository root:
 
 ```powershell
-Set-Location 'C:\dev\Look_Outside_Archipelago_Mod'
-python -B tools/build_package.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
+$gameSource = Read-Host 'Path to your Look Outside installation'
+python -B tools/build_package.py --game-dir "$gameSource"
 ```
 
 The ZIP under `build/packages` contains the APWorld, plugin, sample YAML,
@@ -383,7 +388,8 @@ does not show whether an older ZIP includes current generation logic.
    steps above, using the new test game's path.
 
 ```powershell
-python .\prepare_mod.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
+$gameSource = Read-Host 'Path to your Look Outside installation'
+python .\prepare_mod.py --game-dir "$gameSource"
 ```
 
 Preparation reads an original plugin list and preserves its entries and order.
@@ -424,10 +430,11 @@ rejected. These results do not replace a full interactive playthrough.
 Run from the project root:
 
 ```powershell
+$gameSource = Read-Host 'Path to your Look Outside installation'
 python -B -m unittest discover -s tests -p 'test_*.py'
 node tests/plugin_interception.test.js
 python -B tools/audit_access.py --require-complete
-python -B tools/audit_chronology.py --game-dir 'C:\Games\Steam\steamapps\common\Look Outside'
+python -B tools/audit_chronology.py --game-dir "$gameSource"
 python -B tools/sync_plugin_registry.py --check
 python -B tools/sync_setup_guide.py --check
 ```
