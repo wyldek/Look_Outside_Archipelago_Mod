@@ -91,7 +91,7 @@ preceded region integration; current evidence is in `audit_status.md`.
   of mind preserves the native dialogue and cannot duplicate the AP check or
   restore a tired Medic. This is separate from Fake Frederic's existing group.
 
-Registry 73 has 35 resolution groups. The fungus rescues, Darryl and the Spider
+Registry 74 has 35 resolution groups. The fungus rescues, Darryl and the Spider
 Husk add three groups; see `late_reward_audit.md` for their terminal outcomes.
 New native coverage includes 13 Rat Freak,
 16 Sybil, 51 Hellen/Dan and 253 fixed-collectible scenarios. Tests include

@@ -36,6 +36,12 @@ module.exports = async function nativeMenuProbe(slotData) {
         // Isolate the menu fixture from the currently displayed title/map scene
         // while the dialog's asynchronous status refresh is being exercised.
         SceneManager.updateScene = () => {};
+        // This fixture can run before Scene_Boot initializes UI resources.
+        ColorManager.loadWindowskin();
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Menu windowskin did not load")), 5000);
+            ColorManager._windowskin.addLoadListener(() => { clearTimeout(timeout); resolve(); });
+        });
         globalThis.WebSocket = TestSocket;
         localStorage.removeItem(preferencesKey);
         DataManager.setupNewGame();

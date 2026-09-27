@@ -33,7 +33,8 @@ def main():
     parser.add_argument("--game-dir", required=True, type=Path, help="Read-only game used for signature validation")
     args = parser.parse_args()
     for command in [["tools/validate_registry.py", "--game-dir", str(args.game_dir)],
-                    ["tools/sync_plugin_registry.py", "--check"]]:
+                    ["tools/sync_plugin_registry.py", "--check"],
+                    ["tools/sync_setup_guide.py", "--check"]]:
         subprocess.run([sys.executable, "-B", *command], cwd=PROJECT, check=True)
     registry = json.loads((WORLD / "vertical_slice.json").read_text(encoding="utf-8"))
     graph = load_access()
@@ -49,7 +50,8 @@ def main():
              "README.md": (PROJECT / "docs" / "package_setup.md").read_bytes(),
              "LookOutside.yaml": (PROJECT / "tests" / "fixtures" / "lookoutside.yaml").read_bytes()}
     for name in ("access_logic.md", "calendar_deadlines.md", "quest_resolution_policy.md",
-                 "ending_release.md", "playtest.md", "current_status.md", "late_reward_audit.md"):
+                 "ending_release.md", "playtest.md", "current_status.md", "late_reward_audit.md",
+                 "save_compatibility.md"):
         files["docs/" + name] = (PROJECT / "docs" / name).read_bytes()
     version = f"0.0.1-dev{registry['registry_version']}"
     manifest = {"package_version": version, "development": True,

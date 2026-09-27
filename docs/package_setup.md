@@ -5,6 +5,11 @@ The package manifest identifies the matching plugin and APWorld registry.
 Start a fresh seed and save when the registry changes. This is a development
 build; a complete interactive playthrough, including calendar ordering, remains.
 
+Registry74 uses save schema7. Older AP saves and incompatible registry/game
+versions are rejected with an error before gameplay resumes. Keep the original
+matching mod/game version to finish an older run, or start a new save and seed.
+See `docs/save_compatibility.md`.
+
 ## Prepare the mod
 
 1. Extract this package into a writable folder. Install Python 3.10 or newer
@@ -50,6 +55,9 @@ Choose a new **Normal** game. Open **Archipelago Connect** from the in-game
 menu and enter the server, slot name, and password if needed. Connect before
 collecting any randomized pickup. Archipelago Status shows connection state,
 checks, deliveries, and the reviewed deadline warnings. Passwords are not saved.
+First connection is refused after an audited reward, quest resolution or day
+rollover, and for old vanilla saves without reliable fresh-save metadata.
+Already-received items queued for inventory space can deliver after an offline reload.
 
 Household valuables, the reviewed companion rewards, Morton donations,
 crafting materials, consumables, purchases, random loot, and the Gauntlet stay

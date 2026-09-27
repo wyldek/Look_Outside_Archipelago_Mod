@@ -61,8 +61,10 @@ The additional encounter cases cover early/late restoration at phase zero,
 victory and retreat, the Iris Key pickup, consumed pages after save/load,
 unchanged story state, and pre-outage/no-item/inactive/build/page-copy guards.
 
-Save schema 6 retains schema 5's calendar holds. Unit tests cover migration and
-preservation of unsupported power payloads. Live Archipelago 0.6.7 seed 143
+Historically, schema6 migrated schema5 calendar holds. Current schema7 requires
+matching registry/build metadata and rejects older AP schemas; see
+`save_compatibility.md`. The 28 native power scenarios also pass at registry74.
+Live Archipelago 0.6.7 seed 143
 exchanged all 259 checks and items and exercised early receipt followed by the
 outage hooks. The server confirmed goal completion on Day 15. Full interactive playthrough
-and generation region logic remain outstanding.
+remains outstanding. Current generation evidence is in `current_status.md`.

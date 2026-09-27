@@ -13,7 +13,7 @@
 
     const pluginName = "LookOutsideArchipelago";
     const auditedBuild = Object.freeze({ gameId: 51778622, versionId: 74642914 });
-    const developmentRegistryVersion = 73;
+    const developmentRegistryVersion = 74;
     if (globalThis.LookOutsideArchipelago) {
         throw new Error(`${pluginName} loaded more than once`);
     }
@@ -8527,12 +8527,14 @@
     // END GENERATED DEVELOPMENT REGISTRY
 
     const saveKey = "lookOutsideArchipelago";
-    const saveSchema = 6;
+    const saveSchema = 7;
+    const eligibilityKey = "lookOutsideArchipelagoStart";
+    let firstBindingEligible = false;
+    let resumedInterpreters = new Set();
     let active = false;
     let checkHandler = null;
     let checkedKeys = new Set();
     let saveError = null;
-    let unsupportedSaveState = null;
     let hasApSaveState = false;
     let identity = null;
     let nextItemIndex = 0;
@@ -8681,75 +8683,85 @@
         checkHandler = null;
         checkedKeys = new Set();
         saveError = null;
-        unsupportedSaveState = null;
         hasApSaveState = false;
         identity = null;
         nextItemIndex = 0;
         pendingItems = [];
+        firstBindingEligible = false;
+        resumedInterpreters.clear();
     }
 
-    function restoreSession(saved) {
+    function compatibilityStamp() {
+        return { registryVersion: developmentRegistryVersion, gameId: auditedBuild.gameId,
+            versionId: auditedBuild.versionId };
+    }
+
+    function compatibleStamp(stamp) {
+        return stamp && Object.entries(compatibilityStamp()).every(([key, value]) => stamp[key] === value);
+    }
+
+    function rejectSave(saved, reason) {
+        active = false;
+        itemDefinitions = null;
+        saveError = `${reason}. Load this save with its original matching mod/game version, or start a new Normal game. The save file has not been changed.`;
+        throw new Error(saveError);
+    }
+
+    function restoreSession(saved, start, switches, present) {
         resetSession();
-        if (saved == null) return;
+        firstBindingEligible = start?.schema === 1 && compatibleStamp(start.compatibility) && start.eligible === true &&
+            globalThis.$dataSystem?.advanced?.gameId === auditedBuild.gameId &&
+            globalThis.$dataSystem?.versionId === auditedBuild.versionId;
+        if (!present) return;
         hasApSaveState = true;
-        if (!isNormalMode()) {
-            saveError = "This Archipelago version requires Normal difficulty";
-            unsupportedSaveState = saved;
-            return;
-        }
+        if (!saved || saved.schema !== saveSchema) rejectSave(saved, "Unsupported Archipelago save schema (older schemas lack compatibility metadata)");
+        if (!compatibleStamp(saved.compatibility)) rejectSave(saved, "Archipelago save registry or audited build differs from this mod");
+        if (globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
+            globalThis.$dataSystem?.versionId !== auditedBuild.versionId) rejectSave(saved, "Installed game build differs from audited build");
+        if (switches?.value(8) || switches?.value(13)) rejectSave(saved, "This Archipelago version requires Normal difficulty");
         const validKeys = Array.isArray(saved.checkedKeys) &&
-            saved.checkedKeys.every(key => typeof key === "string");
+            saved.checkedKeys.every(key => Object.hasOwn(developmentLocationIds, key)) &&
+            new Set(saved.checkedKeys).size === saved.checkedKeys.length;
         const validIdentity = saved.identity === null ||
-            (saved.identity && typeof saved.identity.seedName === "string" &&
-                Number.isSafeInteger(saved.identity.team) &&
-                Number.isSafeInteger(saved.identity.slot));
+            (saved.identity && typeof saved.identity.seedName === "string" && saved.identity.seedName &&
+                Number.isSafeInteger(saved.identity.team) && saved.identity.team >= 0 &&
+                Number.isSafeInteger(saved.identity.slot) && saved.identity.slot >= 1);
         const validItems = Number.isSafeInteger(saved.nextItemIndex) &&
             saved.nextItemIndex >= 0 && Array.isArray(saved.pendingItems) &&
-            saved.pendingItems.every(entry => Number.isSafeInteger(entry.index) &&
-                entry.index >= 0 && entry.item && Number.isSafeInteger(entry.item.item));
+            saved.pendingItems.every((entry, i) => entry && Number.isSafeInteger(entry.index) &&
+                entry.index >= 0 && entry.index < saved.nextItemIndex &&
+                (i === 0 || saved.pendingItems[i - 1].index < entry.index) && entry.item &&
+                Number.isSafeInteger(entry.item.item) && Object.hasOwn(developmentItemDefinitions, entry.item.item));
         const validPower = saved.powerState &&
             ["received", "outageSeen", "outageInProgress", "puzzleRefreshPending"].every(
                 key => typeof saved.powerState[key] === "boolean") &&
             (!saved.powerState.outageInProgress || saved.powerState.outageSeen) &&
             Array.isArray(saved.powerState.notices) && saved.powerState.notices.every(
                 notice => ["received", "outage", "outage-restored", "restored", "checked"].includes(notice));
-        if (!validKeys || ![1, 2, 3, 4, 5, saveSchema].includes(saved.schema) ||
-            (saved.schema >= 2 && (!validIdentity || !validItems)) ||
-            (saved.schema >= 3 && typeof saved.goalCompleted !== "boolean") ||
-            (saved.schema >= 4 && typeof saved.elevatorFreakDefeated !== "boolean") ||
-            (saved.schema >= 5 &&
-                (typeof saved.pendingDayRollover !== "boolean" ||
-                    typeof saved.dayHold !== "boolean" ||
-                    (saved.pendingDayRollover && saved.dayHold))) ||
-            (saved.schema >= 6 && !validPower)) {
-            saveError = "Unsupported Archipelago save state";
-            unsupportedSaveState = saved;
-            console.error(`[${pluginName}] ${saveError}; AP activation disabled`);
-            return;
+        if (!validKeys || !validIdentity || !validItems ||
+            typeof saved.goalCompleted !== "boolean" ||
+            typeof saved.elevatorFreakDefeated !== "boolean" ||
+            typeof saved.pendingDayRollover !== "boolean" || typeof saved.dayHold !== "boolean" ||
+            (saved.pendingDayRollover && saved.dayHold) || !validPower) {
+            rejectSave(saved, "Unsupported Archipelago save state or unknown queued item");
         }
         checkedKeys = new Set(saved.checkedKeys);
-        if (saved.schema >= 2) {
-            identity = saved.identity;
-            nextItemIndex = saved.nextItemIndex;
-            pendingItems = saved.pendingItems.slice();
-            active = identity !== null;
-        }
-        goalCompleted = saved.schema >= 3 && saved.goalCompleted;
-        elevatorFreakDefeated = saved.schema >= 4 && saved.elevatorFreakDefeated;
-        pendingDayRollover = saved.schema >= 5 && saved.pendingDayRollover;
-        dayHold = saved.schema >= 5 && saved.dayHold;
-        if (saved.schema >= 6) {
-            powerState = { ...saved.powerState, notices: saved.powerState.notices.slice() };
-        } else {
-            // Older development saves may already be in the vanilla blackout.
-            powerState.outageSeen = globalThis.$gameVariables?.value(15) > 0 &&
-                !globalThis.$gameSwitches?.value(21) && !globalThis.$gameSwitches?.value(830);
-        }
+        identity = saved.identity && { ...saved.identity };
+        nextItemIndex = saved.nextItemIndex;
+        pendingItems = saved.pendingItems.map(entry => ({ index: entry.index, item: { ...entry.item } }));
+        active = identity !== null;
+        itemDefinitions = developmentItemDefinitions;
+        goalCompleted = saved.goalCompleted;
+        elevatorFreakDefeated = saved.elevatorFreakDefeated;
+        pendingDayRollover = saved.pendingDayRollover;
+        dayHold = saved.dayHold;
+        powerState = { ...saved.powerState, notices: saved.powerState.notices.slice() };
     }
 
     function saveSnapshot() {
         return {
             schema: saveSchema,
+            compatibility: compatibilityStamp(),
             identity,
             checkedKeys: [...checkedKeys],
             nextItemIndex,
@@ -9162,6 +9174,7 @@
     }
 
     function bindIdentity(seedName, team, slot) {
+        if (saveError) throw new Error(saveError);
         requireNormalMode();
         if (typeof seedName !== "string" || !seedName ||
             !Number.isSafeInteger(team) || team < 0 ||
@@ -9174,11 +9187,18 @@
                 throw new Error("Archipelago seed or slot differs from this save");
             }
         } else {
+            requireFirstBindingEligibility();
             if (checkedKeys.size || nextItemIndex || pendingItems.length) {
                 throw new Error("Cannot bind an unowned Archipelago save with existing progress");
             }
             identity = incoming;
             hasApSaveState = true;
+        }
+    }
+
+    function requireFirstBindingEligibility() {
+        if (!identity && !firstBindingEligible) {
+            throw new Error("This save is not eligible for a first Archipelago connection. Start a new Normal game with this mod and connect before collecting randomized rewards, resolving their quests, or advancing a day.");
         }
     }
 
@@ -9188,6 +9208,8 @@
             throw new Error("Invalid ReceivedItems packet");
         }
         if (startIndex > nextItemIndex) return false;
+        const definitions = itemDefinitions || developmentItemDefinitions;
+        if (items.some(item => !Object.hasOwn(definitions, item.item))) throw new Error("Unknown Archipelago item ID; use a matching APWorld and plugin");
         for (let offset = Math.max(0, nextItemIndex - startIndex); offset < items.length; offset++) {
             const item = items[offset];
             pendingItems.push({ index: startIndex + offset, item });
@@ -9197,7 +9219,7 @@
     }
 
     function deliverPendingItems() {
-        if (!itemDefinitions || !globalThis.$gameParty) return;
+        if (saveError || !itemDefinitions || !globalThis.$gameParty) return;
         for (const entry of [...pendingItems]) {
             const definition = itemDefinitions[entry.item.item];
             if (!definition) continue;
@@ -9266,6 +9288,7 @@
     function connectForDevelopment(options, isRetry = false) {
         requireNormalMode();
         if (saveError) throw new Error(saveError);
+        requireFirstBindingEligibility();
         if (globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
             globalThis.$dataSystem?.versionId !== auditedBuild.versionId) {
             throw new Error("Installed game build differs from audited build");
@@ -9459,8 +9482,8 @@
         };
     }
 
-    function matchingSource(interpreter, commandCode, params) {
-        if (!active || !interpreter || !Array.isArray(params)) return null;
+    function matchingSource(interpreter, commandCode, params, enabled = active) {
+        if (!enabled || !interpreter || !Array.isArray(params)) return null;
         if (globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
             globalThis.$dataSystem?.versionId !== auditedBuild.versionId) return null;
         const command = interpreter._list?.[interpreter._index];
@@ -9530,8 +9553,8 @@
         return true;
     }
 
-    function matchingQuestTerminal(interpreter, commandCode, params) {
-        if (!active || globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
+    function matchingQuestTerminal(interpreter, commandCode, params, enabled = active) {
+        if (!enabled || globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
             globalThis.$dataSystem?.versionId !== auditedBuild.versionId) return null;
         const command = interpreter._list?.[interpreter._index];
         const event = globalThis.$gameMap?.event(interpreter._eventId);
@@ -9653,7 +9676,7 @@
         const event = globalThis.$gameMap?.event(this._eventId);
         const previous = pendingBattleSources;
         pendingBattleSources = [];
-        if (active && event && Array.isArray(params) && command?.code === 301 &&
+        if ((active || firstBindingEligible) && event && Array.isArray(params) && command?.code === 301 &&
             globalThis.$dataSystem?.advanced?.gameId === auditedBuild.gameId &&
             globalThis.$dataSystem?.versionId === auditedBuild.versionId &&
             command.parameters?.length === params.length &&
@@ -9698,7 +9721,7 @@
         const originalMakeDropItems = enemyPrototype.makeDropItems;
         enemyPrototype.makeDropItems = function(...args) {
             const drops = originalMakeDropItems.apply(this, args);
-            if (!active || !collectingVictoryDrops || !battleSources.length ||
+            if (!collectingVictoryDrops || !battleSources.length ||
                 globalThis.$dataSystem?.advanced?.gameId !== auditedBuild.gameId ||
                 globalThis.$dataSystem?.versionId !== auditedBuild.versionId ||
                 globalThis.$gameTroop?.troop()?.id !== battleTroopId) return drops;
@@ -9712,6 +9735,10 @@
                 const item = this.itemObject(definition.kind, source.databaseId);
                 const index = filtered.indexOf(item);
                 if (index < 0) continue;
+                if (!active) {
+                    if (!identity) firstBindingEligible = false;
+                    continue; // The inactive game still receives its vanilla loot.
+                }
                 filtered.splice(index, 1);
                 victoryDropChecks.set(source.key, source);
             }
@@ -9891,6 +9918,85 @@
         return originalCommand101.call(this, params);
     };
 
+    // Track actual audited rewards/resolutions before first connection. This
+    // leaves native outcomes intact while preventing a later partial AP start.
+    for (const code of [121, 122, 123, 126, 127, 128, 404, 412]) {
+        const original = interpreter[`command${code}`];
+        if (!original) continue;
+        interpreter[`command${code}`] = function(params) {
+            if (saveError) return false;
+            if (!identity && !active && firstBindingEligible &&
+                (matchingSource(this, code, params, true) || matchingQuestTerminal(this, code, params, true) ||
+                    (code === 122 && (isTimePassesCommand(this, 59, 122, [15, 15, 1, 0, 1]) ||
+                        isTimePassesCommand(this, 78, 122, [15, 15, 1, 0, 1]))))) firstBindingEligible = false;
+            return original.call(this, params);
+        };
+    }
+    function mapInterpreters(map) {
+        const result = new Set();
+        function add(it) {
+            if (!it || result.has(it)) return;
+            result.add(it);
+            add(it._childInterpreter);
+        }
+        add(map?._interpreter);
+        for (const event of [...(map?._events || []), ...(map?._commonEvents || [])]) add(event?._interpreter);
+        return result;
+    }
+
+    function stampInterpreterSources(map) {
+        const originals = new Map();
+        for (const event of globalThis.$dataCommonEvents || []) {
+            if (event?.list) originals.set(event.list, { kind: "common", id: event.id });
+        }
+        for (const event of map?.events?.() || []) {
+            event.event()?.pages?.forEach((page, index) => originals.set(page.list,
+                { kind: "map", mapId: map.mapId(), eventId: event._eventId, page: index }));
+        }
+        for (const it of mapInterpreters(map)) {
+            const origin = originals.get(it._list);
+            it._loaSavedSource = origin ? { ...origin, ownerMapId: it._mapId, ownerEventId: it._eventId } : null;
+        }
+    }
+
+    function restoreInterpreterSource(it) {
+        if (!resumedInterpreters.has(it)) return;
+        resumedInterpreters.delete(it);
+        const origin = it._loaSavedSource;
+        if (!origin || !it._list) return; // Unrelated plugin-created lists retain their original guards.
+        const list = origin.kind === "common" ? globalThis.$dataCommonEvents?.[origin.id]?.list :
+            origin.kind === "map" && $gameMap.mapId() === origin.mapId ?
+                $gameMap.event(origin.eventId)?.event()?.pages?.[origin.page]?.list : null;
+        if (!list || it._mapId !== origin.ownerMapId || it._eventId !== origin.ownerEventId ||
+            JSON.stringify(it._list) !== JSON.stringify(list)) {
+            rejectSave(null, "Cannot safely resume a changed Archipelago event list");
+        }
+        // Only interpreters loaded through DataManager, with a saved canonical
+        // origin and an exact whole-list match, may regain reference identity.
+        it._list = list;
+    }
+
+    function restoreInterpreterSources() {
+        for (const it of resumedInterpreters) restoreInterpreterSource(it);
+    }
+
+    const originalInterpreterSetup = interpreter.setup;
+    if (originalInterpreterSetup) {
+        interpreter.setup = function() {
+            resumedInterpreters.delete(this);
+            this._loaSavedSource = null;
+            return originalInterpreterSetup.apply(this, arguments);
+        };
+    }
+    const originalExecuteCommand = interpreter.executeCommand;
+    if (originalExecuteCommand) {
+        interpreter.executeCommand = function() {
+            if (saveError) return false;
+            restoreInterpreterSource(this);
+            return originalExecuteCommand.apply(this, arguments);
+        };
+    }
+
     const dataManager = globalThis.DataManager;
     if (!dataManager) throw new Error(`${pluginName} requires DataManager`);
     const originalSetupNewGame = dataManager.setupNewGame;
@@ -9899,27 +10005,46 @@
     dataManager.setupNewGame = function() {
         const result = originalSetupNewGame.apply(this, arguments);
         resetSession();
+        firstBindingEligible = true;
         return result;
     };
     dataManager.makeSaveContents = function() {
+        if (saveError) throw new Error(saveError);
+        restoreInterpreterSources();
         const contents = originalMakeSaveContents.apply(this, arguments);
+        if (hasApSaveState || firstBindingEligible) stampInterpreterSources(contents.map);
+        contents[eligibilityKey] = { schema: 1, compatibility: compatibilityStamp(), eligible: firstBindingEligible };
         if (hasApSaveState) {
-            contents[saveKey] = saveError
-                ? unsupportedSaveState
-                : saveSnapshot();
+            contents[saveKey] = saveSnapshot();
         }
         return contents;
     };
     dataManager.extractSaveContents = function(contents) {
+        // Validate before installing the native map, inventory or quest state.
+        // Throwing rejects MZ's loadGame promise, so Scene_Load stays on its list.
+        restoreSession(contents?.[saveKey], contents?.[eligibilityKey],
+            contents?.switches || globalThis.$gameSwitches, Object.hasOwn(contents || {}, saveKey));
         const result = originalExtractSaveContents.apply(this, arguments);
-        restoreSession(contents?.[saveKey]);
+        if (hasApSaveState || firstBindingEligible) resumedInterpreters = mapInterpreters(contents.map);
         return result;
     };
+
+    const sceneLoad = globalThis.Scene_Load?.prototype;
+    if (sceneLoad?.onLoadFailure) {
+        const originalLoadFailure = sceneLoad.onLoadFailure;
+        sceneLoad.onLoadFailure = function() {
+            const result = originalLoadFailure.apply(this, arguments);
+            if (saveError) globalThis.alert?.(saveError);
+            return result;
+        };
+    }
 
     const sceneMap = globalThis.Scene_Map?.prototype;
     if (sceneMap?.update) {
         const originalSceneMapUpdate = sceneMap.update;
         sceneMap.update = function() {
+            if (saveError) return;
+            restoreInterpreterSources();
             const result = originalSceneMapUpdate.apply(this, arguments);
             deliverPendingItems();
             updatePowerPresentation();

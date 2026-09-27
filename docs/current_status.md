@@ -1,6 +1,6 @@
 # Current development checkpoint
 
-Registry **73**, game build **74642914**, Normal difficulty, **273 checks/items**.
+Registry **74**, game build **74642914**, Normal difficulty, **273 checks/items**.
 The pool contains 167 equipment copies, 103 physical items and three access unlocks.
 This document supersedes numerical checkpoints in older audit batch histories.
 
@@ -13,7 +13,12 @@ This document supersedes numerical checkpoints in older audit batch histories.
 - **30 Simple Keys** and **two Black Keys** delivered through the reviewed bundles.
 - Vanilla quest dates/new-day waits, a 4 a.m. hold, and the Day15 home-door fallback.
   Any real ending on any day completes the goal and requests remaining-check release.
-- **35 Python tests and 41 Node tests pass**. Registry signatures and plugin sync pass.
+- **36 Python tests and 44 Node tests pass**. Registry signatures and plugin sync pass.
+- Save schema7 validates registry/build compatibility before native state loads.
+  Older AP schemas are rejected. Compatible queues deliver offline; first binding
+  requires reliable fresh-save metadata. See `save_compatibility.md`.
+- **16 native disk-save scenarios pass**, including bed/Sybil resumes, overflow
+  delivery without a socket, rejected loads and interpreter provenance guards.
 - Added native probes: 13 Rat Freak, 16 Sybil, 15 access-route, 25 flesh-route,
   51 Hellen/Dan, and 253 fixed-collectible scenarios. Earlier native batches
   are retained in the audit history.
@@ -31,17 +36,19 @@ This document supersedes numerical checkpoints in older audit batch histories.
 
 | Seed | Players | Checks reached without release | Spheres | Evidence |
 | --- | --- | --- | --- | --- |
-| 167 | 1 | 273 / 273 | 8 | Live exchange delivered all 273 items, 35 families and Day7 goal confirmation. |
-| 168 | 2 | 546 / 546 | 17 | 276 cross-player items; all 18 excluded checks contain filler. |
+| 169 | 1 | 273 / 273 | 13 | Live exchange delivered all 273 items, 35 families and Day7 goal confirmation. |
+| 171 | 2 | 546 / 546 | 17 | 266 cross-player items; 18 excluded checks contain filler. Native delayed-Rose/offline-ending release passed. |
 
 Archives are project-local:
 
-- `.local/ap-output/AP_15139323346410571766.zip`
-- `.local/ap-output/AP_75906120961547370236.zip`
+- `.local/ap-output/AP_83375365070562934785.zip`
+- `.local/ap-output/AP_88626157643827000401.zip`
 
 Earlier integrated seeds155–158 passed at 264 checks and seeds159–161 at 267.
 Seeds162–163 passed at 269 checks before adding the car-trunk Shotgun.
 Seeds164–165 passed at 270 checks; seed166 at 272 preceded the final scope changes.
+Registry73 seeds167–168 passed at 273 checks. Registry74 seed170 also reached
+all 546 two-player checks in 12 spheres; seed171 supplied the cross-player Rose fixture.
 Earlier seed154 tests
 also verified online/offline Day15 release and a room with release disabled.
 

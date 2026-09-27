@@ -140,6 +140,7 @@ function check(location) {
 }
 
 async function main() {
+    DataManager.setupNewGame();
     const url = process.argv[2] || "ws://127.0.0.1:38282";
     const outgoing = [];
     class RecordingWebSocket extends WebSocket {

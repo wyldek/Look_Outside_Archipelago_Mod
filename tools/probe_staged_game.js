@@ -57,6 +57,9 @@ async function main() {
         }
         const setup = await evaluate(`(() => {
             process.env.LOA_DEV_MODE = "1";
+            // Some hidden NW.js starts expose the database before Scene_Boot.
+            // Use the game's own encryption settings before any UI asset loads.
+            Scene_Boot.prototype.setEncryptionInfo.call({});
             // Synthetic probe outcomes must never update the user's Steam stats.
             globalThis.setAchievement = () => {};
             globalThis.setGamestat = () => {};
@@ -73,6 +76,15 @@ async function main() {
         assert.deepEqual(setup, { plugin: true, pageIndex: 0,
             mapId: 23, version: 74642914 });
 
+        if (process.argv[3] === "session") {
+            console.log(JSON.stringify(await evaluate(`(${require("../tests/native_session_probe").toString()})()`)));
+            return;
+        }
+        if (process.argv[3] === "multi-delay") {
+            const url = process.argv[4] || "ws://127.0.0.1:38316";
+            console.log(JSON.stringify(await evaluate(`(${require("../tests/native_multi_delay_probe").toString()})(${JSON.stringify(url)})`)));
+            return;
+        }
         if (process.argv[3] === "ending-warnings") {
             console.log(JSON.stringify(await evaluate(`(${require("../tests/native_ending_warnings_probe").toString()})()`)));
             return;

@@ -12,6 +12,12 @@ separate game copy; this project's installed Steam directory stays read-only.
 - Save, close, restart, and reconnect during progression. Confirm the same seed
   resumes with no repeated items. Disconnect temporarily, collect a check, save,
   and reconnect; verify the check is delivered once.
+- Fill an inventory stack, receive one more copy, save and reload offline, then
+  free space. The already-received copy should deliver once without a connection.
+- Delay a prerequisite past a native quest deadline, complete an ending offline,
+  save/reload and reconnect. Confirm missed checks release without reopening the
+  quest or collecting unchecked locations from another player's world. The
+  controlled two-player Rose fixture passes; repeat this during an ordinary run.
 - Resolve a quest by refusal or an alternate outcome. Check its full resolution
   group in Archipelago Status without changing the native story result.
 - Test power in both orders across separate seeds: receive Power Restored before

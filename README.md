@@ -18,6 +18,11 @@ remains the release gate.
 New AP sessions require `LOA_DEV_MODE=1`. See [package setup](docs/package_setup.md)
 and the [playtest guide](docs/playtest.md).
 
+Registry74 requires a new seed/save. Schema7 validates compatibility before
+loading AP state; older AP saves need their original matching mod/game version.
+Offline queued delivery and first-connection eligibility are enforced. See
+[save compatibility](docs/save_compatibility.md).
+
 Implemented behavior includes exact event interception, saved seed/slot binding,
 reconnection, indexed item delivery, inventory overflow queues, intentional day
 advancement, and quest reconciliation. Boss salvage checks work without Audrey.
@@ -108,7 +113,7 @@ node --test --test-isolation=none tests/plugin_interception.test.js
 python -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Current checkpoint: registry 73, with 41 Node tests and 35 Python tests passing.
+Current checkpoint: registry 74, with 44 Node tests and 36 Python tests passing.
 Native NW.js probes
 pass 96 salvage, 185 drop, 68 fixed-item, 10 NPC-gift, four ritual, 12 peaceful
 quest, 44 additional quest-item, and six Joel dialogue scenarios. They also cover
@@ -131,12 +136,17 @@ The final reward audit adds 22 first-gift, 65 late-resolution and 16 bookshelf/
 household scenarios. Another 38 native scenarios verify ending-choice warnings.
 See [the reward audit](docs/late_reward_audit.md).
 
-Archipelago 0.6.7 seed167 passed all 273 checks and deliveries and 35 quest
+Archipelago 0.6.7 seed169 passed all 273 checks and deliveries and 35 quest
 families. The server confirmed goal completion on Day 7. Independent sphere
-verification reached all 273 checks in seed167 and all 546 checks in the
-two-player seed168, without using ending release. Earlier integrated seeds
+verification reached all 273 checks in seed169 and all 546 checks in the
+two-player seed171, without using ending release. Earlier integrated seeds
 155–158 passed at the 264-check checkpoint. These are automated checks, not a
 complete gameplay run.
+
+Sixteen native disk-save scenarios verify compatibility errors, offline overflow,
+eligibility and event resumption. The two-player seed171 native probe verifies a
+Rose arriving after Charan's deadline, followed by an offline ending, disk reload
+and reconnect releasing all 273 checks without changing native quest stages.
 
 Fresh sessions of the earlier seed154 verified Day 15 completion releasing all 264
 checks from zero, both online and after an offline ending/save reload, with

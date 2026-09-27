@@ -187,9 +187,9 @@ and removal of two disconnected valve rooms. See `finite_key_budgets.md`.
 `tools/verify_seed_spheres.py` reads real generated spoiler placements and
 collects only reachable checks before delivering each sphere's items. It checks
 pool quantities, all checks, and filler-only exclusions without using Victory
-or ending release. Seed167 reaches all 273 checks in 8 spheres. Two-player
-seed168 reaches all 546 checks in 17 spheres, with 276 cross-player items and
-18 excluded locations containing filler. Earlier seeds155–166 also passed.
+or ending release. Seed169 reaches all 273 checks in 13 spheres. Two-player
+seed171 reaches all 546 checks in 17 spheres, with 266 cross-player items and
+18 excluded locations containing filler. Earlier seeds155–168 also passed.
 
 The native Day15 fallback makes AP's completion event reachable without an
 AP item. Consequently goal-only generation success is insufficient evidence;

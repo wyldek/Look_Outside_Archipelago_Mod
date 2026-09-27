@@ -263,7 +263,7 @@ module.exports = function nativePowerProbe() {
                         key._index = index;
                         key.executeCommand();
                     }
-                    assert.deepEqual(ap.checkedKeys(), ["map086_event106"]);
+                    assert.deepEqual([...ap.checkedKeys()].sort(), ["darryl_legs", "map086_event106"]);
                     assert.equal($gameParty.numItems($dataItems[395]), 0);
                 }
                 reload();

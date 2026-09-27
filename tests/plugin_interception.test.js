@@ -8,6 +8,12 @@ const inventory = [];
 const messages = [];
 let goldAmount = 0;
 class FakeInterpreter {
+    executeCommand() {
+        const c = this._list[this._index];
+        const result = this[`command${c.code}`](c.parameters);
+        if (result) this._index++;
+        return result;
+    }
     constructor(mapId, eventId, pageIndex, commandIndex, code, params) {
         this._mapId = mapId;
         this._eventId = eventId;
@@ -101,10 +107,11 @@ globalThis.$gameSwitches = {
     setValue(id, value) { switchValues.set(id, value); },
 };
 globalThis.$dataSystem = { advanced: { gameId: 51778622 }, versionId: 74642914 };
+let nativeLoads = 0;
 globalThis.DataManager = {
     setupNewGame() { return "new-game"; },
     makeSaveContents() { return { system: "vanilla-system" }; },
-    extractSaveContents(contents) { assert.equal(contents.system, "vanilla-system"); },
+    extractSaveContents(contents) { nativeLoads++; assert.equal(contents.system, "vanilla-system"); },
 };
 const battleHarness = require("./battle_drop_harness")();
 require("../game_plugin/LookOutsideArchipelago.js");
@@ -146,12 +153,90 @@ test("development protocol IDs agree with the shared vertical-slice registry", (
 });
 
 test("inactive plugin leaves vanilla grants alone", () => {
+    DataManager.setupNewGame();
     inventory.length = 0;
-    assert.deepEqual(DataManager.makeSaveContents(), { system: "vanilla-system" });
+    assert.equal(DataManager.makeSaveContents().lookOutsideArchipelago, undefined);
     const source = new FakeInterpreter(23, 41, 0, 7, 127, [15, 0, 0, 1, false]);
     currentEvent = { _eventId: 41, _pageIndex: 0 };
     assert.equal(source.command127([15, 0, 0, 1, false]), true);
     assert.deepEqual(inventory, [["weapon", 15]]);
+});
+
+test("first binding rejects consumed rewards and old vanilla saves before opening a socket", () => {
+    DataManager.setupNewGame();
+    const pristine = JSON.parse(JSON.stringify(DataManager.makeSaveContents()));
+    const bat = new FakeInterpreter(23, 41, 0, 7, 127, [15, 0, 0, 1, false]);
+    currentEvent = { _eventId: 41, _pageIndex: 0 };
+    bat.command127([15, 0, 0, 1, false]);
+    const progressed = JSON.parse(JSON.stringify(DataManager.makeSaveContents()));
+    let sockets = 0;
+    for (const contents of [progressed, {system: "vanilla-system"}]) {
+        DataManager.extractSaveContents(contents);
+        assert.throws(() => plugin.bindIdentityForDevelopment("late", 0, 1), /not eligible/);
+        assert.throws(() => plugin.connectForDevelopment({WebSocketClass: class { constructor() { sockets++; } }}), /not eligible/);
+        assert.equal(plugin.identity(), null);
+    }
+    assert.equal(sockets, 0);
+    DataManager.extractSaveContents(pristine);
+    plugin.bindIdentityForDevelopment("fresh", 0, 1);
+    assert.equal(plugin.identity().seedName, "fresh");
+    DataManager.setupNewGame();
+});
+
+test("compatibility and queue corruption fail before loading native state", () => {
+    DataManager.setupNewGame();
+    plugin.bindIdentityForDevelopment("compatible", 0, 1);
+    const good = JSON.parse(JSON.stringify(DataManager.makeSaveContents()));
+    for (const mutation of [
+        s => s.compatibility.registryVersion++, s => s.compatibility.gameId++,
+        s => s.compatibility.versionId++, s => delete s.compatibility,
+        s => { s.nextItemIndex = 1; s.pendingItems = [{index: 0, item: {item: 999999}}]; },
+        s => { s.nextItemIndex = 1; s.pendingItems = [{index: 1, item: {item: 540100015}}]; },
+        s => { s.nextItemIndex = 1; s.pendingItems = [0, 0].map(index => ({index, item: {item: 540100015}})); },
+        s => s.checkedKeys.push("unknown-source"),
+    ]) {
+        const bad = structuredClone(good); mutation(bad.lookOutsideArchipelago);
+        const before = nativeLoads;
+        assert.throws(() => DataManager.extractSaveContents(bad), /save .*differs|Unsupported/);
+        assert.equal(nativeLoads, before);
+        assert.equal(plugin.active, false);
+    }
+    for (const field of ["versionId", "gameId"]) {
+        const target = field === "gameId" ? $dataSystem.advanced : $dataSystem;
+        target[field]++;
+        try { assert.throws(() => DataManager.extractSaveContents(good), /audited build/); }
+        finally { target[field]--; }
+    }
+    DataManager.extractSaveContents(good);
+    assert.equal(plugin.active, true);
+    assert.throws(() => plugin.queueReceivedItemsForDevelopment(0, [{item: 999999}]), /Unknown/);
+    assert.equal(plugin.nextItemIndex, 0);
+    DataManager.setupNewGame();
+});
+
+test("native quest resolutions and guaranteed drops make an unbound save ineligible", () => {
+    const registry = require("../apworld/lookoutside/vertical_slice.json");
+    DataManager.setupNewGame();
+    const terminal = registry.quest_families.flatMap(f => f.terminals).find(t =>
+        !t.common_event_id && !t.troop_id && !t.required_variables && t.command_code === 121);
+    currentEvent = { _eventId: terminal.event_id, _pageIndex: terminal.page };
+    new FakeInterpreter(terminal.map_id, terminal.event_id, terminal.page, terminal.command_index,
+        terminal.command_code, terminal.parameters).executeCommand();
+    assert.throws(() => plugin.bindIdentityForDevelopment("late-quest", 0, 1), /not eligible/);
+    assert.deepEqual(plugin.checkedKeys(), []);
+    DataManager.setupNewGame();
+    const location = registry.locations.find(l => l.battle_drop);
+    const drop = location.battle_drop;
+    const drops = Array.from({length: drop.drop_index + 1}, () => ({kind: 0, dataId: 1, denominator: 1}));
+    drops[drop.drop_index] = {kind: drop.kind, dataId: location.reward_database_id, denominator: 1};
+    battleHarness.configure(location.battle_parameters[1], [{id: drop.enemy_id, drops}]);
+    currentEvent = { _eventId: location.event_id, _pageIndex: location.page };
+    new FakeInterpreter(location.map_id, location.event_id, location.page,
+        location.command_index, 301, location.battle_parameters).executeCommand();
+    BattleManager.processVictory();
+    assert.equal(battleHarness.trace.granted.length, 1);
+    assert.throws(() => plugin.bindIdentityForDevelopment("late-drop", 0, 1), /not eligible/);
+    DataManager.setupNewGame();
 });
 
 test("active source check suppresses only the matching reward", () => {
@@ -209,7 +294,8 @@ test("AP pickup text no longer claims the vanilla item was found", () => {
 test("checks survive save/load and are not reported twice", () => {
     const saved = DataManager.makeSaveContents();
     assert.deepEqual(saved.lookOutsideArchipelago, {
-        schema: 6,
+        schema: 7,
+        compatibility: { registryVersion: sliceSlotData.registry_version, gameId: 51778622, versionId: 74642914 },
         identity: null,
         checkedKeys: ["map023_event041_baseball_bat", "map031_event030_hoodie"],
         nextItemIndex: 0,
@@ -238,13 +324,18 @@ test("checks survive save/load and are not reported twice", () => {
     plugin.deactivate();
 });
 
-test("unsupported saved state blocks activation without blocking vanilla load", () => {
+test("unsupported saved state blocks native loading, gameplay and saving", () => {
     const unknownState = { schema: 999, futureField: [1, 2, 3] };
-    DataManager.extractSaveContents({ system: "vanilla-system", lookOutsideArchipelago: unknownState });
+    const before = nativeLoads;
+    assert.throws(() => DataManager.extractSaveContents({ system: "vanilla-system", lookOutsideArchipelago: unknownState }), /Unsupported/);
+    assert.equal(nativeLoads, before);
     assert.equal(plugin.active, false);
     assert.match(plugin.saveError, /Unsupported/);
     assert.throws(() => plugin.activateForDevelopment(), /Unsupported/);
-    assert.deepEqual(DataManager.makeSaveContents().lookOutsideArchipelago, unknownState);
+    assert.throws(() => DataManager.makeSaveContents(), /Unsupported/);
+    const it = new FakeInterpreter(23, 41, 0, 7, 127, [15, 0, 0, 1, false]);
+    assert.equal(it.executeCommand(), false);
+    assert.equal(it._index, 7);
     DataManager.setupNewGame();
     assert.equal(plugin.saveError, null);
 });
@@ -255,48 +346,25 @@ test("a different game build cannot activate interception", () => {
     $dataSystem.versionId--;
 });
 
-test("legacy unbound checks migrate but cannot silently join a seed", () => {
-    DataManager.extractSaveContents({
+test("legacy unbound checks are rejected without migration", () => {
+    assert.throws(() => DataManager.extractSaveContents({
         system: "vanilla-system",
         lookOutsideArchipelago: { schema: 1, checkedKeys: ["map023_event041_baseball_bat"] },
-    });
-    assert.equal(plugin.saveError, null);
-    assert.deepEqual(plugin.checkedKeys(), ["map023_event041_baseball_bat"]);
-    assert.throws(() => plugin.bindIdentityForDevelopment("seed-A", 0, 2), /unowned/);
-    assert.equal(DataManager.makeSaveContents().lookOutsideArchipelago.schema, 6);
+    }), /Unsupported/);
+    assert.throws(() => plugin.bindIdentityForDevelopment("seed-A", 0, 2), /Unsupported/);
     DataManager.setupNewGame();
 });
 
-test("schema 5 saves retain calendar holds while adopting power tracking", () => {
+test("all older AP schemas require their original mod instead of silent migration", () => {
     DataManager.setupNewGame();
     plugin.bindIdentityForDevelopment("old-calendar-seed", 0, 1);
     const saved = DataManager.makeSaveContents();
-    saved.lookOutsideArchipelago.schema = 5;
-    delete saved.lookOutsideArchipelago.powerState;
-    const previousDay = currentDay;
-    const previousPower = $gameSwitches.value(21);
-    try {
-        currentDay = 7;
-        for (const pending of [true, false]) {
-            saved.lookOutsideArchipelago.pendingDayRollover = pending;
-            saved.lookOutsideArchipelago.dayHold = !pending;
-            for (const powerOn of [true, false]) {
-                $gameSwitches.setValue(21, powerOn);
-                DataManager.extractSaveContents(saved);
-                const migrated = DataManager.makeSaveContents().lookOutsideArchipelago;
-                assert.equal(plugin.saveError, null);
-                assert.equal(plugin.active, true);
-                assert.equal(migrated.pendingDayRollover, pending);
-                assert.equal(migrated.dayHold, !pending);
-                assert.equal(migrated.powerState.outageSeen, !powerOn);
-                assert.equal(migrated.powerState.received, false);
-            }
-        }
-    } finally {
-        currentDay = previousDay;
-        $gameSwitches.setValue(21, previousPower);
-        DataManager.setupNewGame();
+    for (const schema of [1, 2, 3, 4, 5, 6]) {
+        saved.lookOutsideArchipelago.schema = schema;
+        assert.throws(() => DataManager.extractSaveContents(saved), /older schemas/);
+        assert.equal(plugin.active, false);
     }
+    DataManager.setupNewGame();
 });
 
 test("invalid power save state disables AP without discarding the saved payload", () => {
@@ -310,11 +378,10 @@ test("invalid power save state disables AP without discarding the saved payload"
     ]) {
         const broken = structuredClone(saved);
         Object.assign(broken.lookOutsideArchipelago.powerState, invalid);
-        DataManager.extractSaveContents(broken);
+        assert.throws(() => DataManager.extractSaveContents(broken), /Unsupported/);
         assert.equal(plugin.active, false);
         assert.match(plugin.saveError, /Unsupported/);
-        assert.deepEqual(DataManager.makeSaveContents().lookOutsideArchipelago,
-            broken.lookOutsideArchipelago);
+        assert.throws(() => DataManager.makeSaveContents(), /Unsupported/);
     }
     DataManager.setupNewGame();
 });
@@ -330,10 +397,10 @@ test("Hard and Easy saves cannot activate or connect to the Normal-only AP world
         assert.throws(() => plugin.bindIdentityForDevelopment("hard-seed", 0, 1), /Normal difficulty/);
         assert.throws(() => plugin.connectForDevelopment({}), /Normal difficulty/);
         assert.equal(plugin.active, false);
-        DataManager.extractSaveContents(saved);
+        assert.throws(() => DataManager.extractSaveContents(saved), /Normal difficulty/);
         assert.equal(plugin.active, false);
         assert.match(plugin.saveError, /Normal difficulty/);
-        assert.deepEqual(DataManager.makeSaveContents().lookOutsideArchipelago, saved.lookOutsideArchipelago);
+        assert.throws(() => DataManager.makeSaveContents(), /Normal difficulty/);
         switchValues.delete(difficultySwitch);
     }
     DataManager.extractSaveContents(saved);
@@ -357,20 +424,20 @@ test("seed and slot binding rejects a different session", () => {
 });
 
 test("ReceivedItems replay is indexed and pending delivery survives reload", () => {
-    const first = { item: 1001, location: 2001, player: 3, flags: 0 };
-    const second = { item: 1002, location: 2002, player: 3, flags: 0 };
+    const first = { item: 540100015, location: 2001, player: 3, flags: 0 };
+    const second = { item: 540200007, location: 2002, player: 3, flags: 0 };
     assert.equal(plugin.queueReceivedItemsForDevelopment(0, [first, second]), true);
     assert.equal(plugin.nextItemIndex, 2);
     assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [0, 1]);
     assert.equal(plugin.queueReceivedItemsForDevelopment(0, [first, second]), true);
     assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [0, 1]);
-    assert.equal(plugin.queueReceivedItemsForDevelopment(4, [{ item: 1005 }]), false);
+    assert.equal(plugin.queueReceivedItemsForDevelopment(4, [{ item: 540100015 }]), false);
     assert.equal(plugin.nextItemIndex, 2);
 
     const saved = DataManager.makeSaveContents();
     DataManager.extractSaveContents(saved);
     assert.equal(plugin.nextItemIndex, 2);
-    assert.deepEqual(plugin.pendingItems().map(entry => entry.item.item), [1001, 1002]);
+    assert.deepEqual(plugin.pendingItems().map(entry => entry.item.item), [540100015, 540200007]);
     plugin.acknowledgePendingItemForDevelopment(0);
     assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [1]);
 });
@@ -449,7 +516,7 @@ test("WebSocket handshake replays offline checks and rejects another seed", () =
     new FakeInterpreter(23, 41, 0, 7, 127, [15, 0, 0, 1, false])
         .command127([15, 0, 0, 1, false]);
     assert.deepEqual(socket.sent.at(-1), { cmd: "LocationChecks", locations: [50001] });
-    socket.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 1001 }] });
+    socket.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 540100015 }] });
     assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [0]);
     socket.close();
     assert.equal(plugin.connectionState, "disconnected");
@@ -468,7 +535,7 @@ test("WebSocket handshake replays offline checks and rejects another seed", () =
     reconnect.server({ cmd: "RoomInfo", seed_name: "seed-A" });
     reconnect.server({ cmd: "Connected", team: 0, slot: 2, checked_locations: [], slot_data: sliceSlotData });
     assert.deepEqual(reconnect.sent.at(-1), { cmd: "LocationChecks", locations: [50001, 50002] });
-    reconnect.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 1001 }] });
+    reconnect.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 540100015 }] });
     assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [0]);
 
     plugin.connectForDevelopment(options);
@@ -634,29 +701,28 @@ test("received equipment grants once and full inventory keeps delivery pending",
         gainItem(item, amount) { counts.set(item, Math.min(this.maxItems(item), this.numItems(item) + amount)); },
     };
     const definitions = {
-        7001: { kind: "weapon", id: 15 },
-        7002: { kind: "armor", id: 7 },
+        540100015: { kind: "weapon", id: 15 },
+        540200007: { kind: "armor", id: 7 },
     };
     plugin.configureItemDefinitionsForDevelopment(definitions);
     plugin.queueReceivedItemsForDevelopment(0, [
-        { item: 7001 }, { item: 7001 }, { item: 7002 }, { item: 7999 },
+        { item: 540100015 }, { item: 540100015 }, { item: 540200007 },
     ]);
     plugin.deliverPendingForDevelopment();
     assert.equal(counts.get($dataWeapons[15]), 1);
     assert.equal(counts.get($dataArmors[7]), 1);
-    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [1, 3]);
+    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [1]);
 
     const saved = DataManager.makeSaveContents();
     DataManager.extractSaveContents(saved);
-    plugin.configureItemDefinitionsForDevelopment(definitions);
     weaponCapacity = 2;
     plugin.deliverPendingForDevelopment();
     assert.equal(counts.get($dataWeapons[15]), 2);
-    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [3]);
+    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), []);
     plugin.queueReceivedItemsForDevelopment(0, [
-        { item: 7001 }, { item: 7001 }, { item: 7002 }, { item: 7999 },
+        { item: 540100015 }, { item: 540100015 }, { item: 540200007 },
     ]);
-    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), [3]);
+    assert.deepEqual(plugin.pendingItems().map(entry => entry.index), []);
 });
 
 test("Elevator Freak victory check and received access stay independent", () => {
@@ -718,6 +784,8 @@ test("normal rollover waits for explicit day advance and runs vanilla newDay", (
 
     interpreter.command122(dayIncrement);
     assert.equal(currentDay, 8); // Vanilla behavior before the AP save is bound.
+    assert.throws(() => plugin.bindIdentityForDevelopment("too-late", 0, 2), /not eligible/);
+    DataManager.setupNewGame();
     currentDay = 7;
     plugin.bindIdentityForDevelopment("seed-day", 0, 2);
     plugin.activateForDevelopment();

@@ -11,8 +11,9 @@ on a different build. The full data fingerprint is recorded in
 
 The first ten locations below established the vertical slice. The registry now
 contains 167 equipment checks, 103 item checks, and three access unlocks: 273 total.
-All pass static validation and the unit tests. Live seed167 covered every check,
-all item deliveries, and 35 resolution families. Simple and finite-key supplies
+All pass static validation and the unit tests. Live seed169 covered every check,
+all item deliveries, and 35 resolution families. Schema7 save and multiplayer
+timing evidence is in `save_compatibility.md`. Simple and finite-key supplies
 also have focused native probes. See `simple_keys.md` and `finite_key_budgets.md`.
 Their exact map, event, command, item, and message signatures are in
 `apworld/lookoutside/vertical_slice.json`. The additional sources passed
@@ -264,16 +265,17 @@ electricity with a message confirming both events. Receiving the item does not
 consume the fuse-box check. A late item restores power on delivery.
 
 Twelve native scenarios cover delivery order, serialized saves, replay, dialogue
-queuing, and source guards. Save schema 6 also preserves schema 5 calendar holds.
+queuing, and source guards. Current schema7 saves preserve calendar holds and
+reject older schemas that lack registry/build compatibility metadata.
 See [power progression](power_progression.md) for hook signatures and verification.
 
 ## Current development package and remaining release work
 
-Registry 73 has a complete integrated access graph (273 checks, 74 regions,
+Registry 74 has a complete integrated access graph (273 checks, 74 regions,
 81 entrances). New native probes verify Rat Freak/Sybil/Hellen/Dan alternatives,
-the metro and later quest routes, fixed collectibles, reusable gifts and the car trunk. All 35
-Python and 41 Node tests pass. Independent sphere tests reach every location in
-single-player seed167 and two-player seed168 without ending release.
+the metro and later quest routes, fixed collectibles, reusable gifts and the car trunk. All 36
+Python and 44 Node tests pass. Independent sphere tests reach every location in
+single-player seed169 and two-player seed171 without ending release.
 
 `tools/build_package.py` produces a development bundle with no game assets.
 Its preparation script writes replacement files beside the extracted package;
