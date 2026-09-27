@@ -238,6 +238,17 @@ goal still counts, but remaining checks need a host permission change. See
 
 ## Setup guide
 
+For installation from a ZIP, download
+[LookOutsideAP-0.0.2-dev74.zip](releases/LookOutsideAP-0.0.2-dev74.zip) from the
+repository's **`releases/` folder** and follow
+[Install the extracted package](#install-the-extracted-package). It includes the
+built APWorld and everything needed to prepare the game-side mod files; a source
+checkout is not required for that workflow. Look Outside, Archipelago, and Python
+are separate prerequisites.
+
+The numbered steps below are the alternative development workflow, using a
+source checkout and project-local copies of both installations.
+
 ### 1. Requirements
 
 - A matching Windows game installation and Archipelago installation. You will
@@ -361,31 +372,28 @@ After binding, offline checks are saved for reconnect, and already-received queu
 items can deliver on a compatible offline reload. Items that have not reached
 the client still require a server connection.
 
-### Optional: build and install an extracted package
+### Install the extracted package
 
-The staging workflow above runs directly from this checkout. To prepare the
-distributable files instead, run from the repository root:
+The ZIP in [releases](releases/README.md) contains `lookoutside.apworld`,
+`LookOutsideArchipelago.js`, `prepare_mod.py`, `LookOutside.yaml`, a setup README,
+the license, manifest/checksums, and playtest documentation. The APWorld is
+already built. The preparation script builds the replacement game files using
+your original plugin list. No game assets are included.
 
-```powershell
-$gameSource = Read-Host 'Path to your Look Outside installation'
-python -B tools/build_package.py --game-dir "$gameSource"
-```
-
-The ZIP under `build/packages` contains the APWorld, plugin, sample YAML,
-preparation script, manifest/checksums, and playtest documentation. It includes
-no game assets. Rebuild after source changes; the registry-based filename alone
-does not show whether an older ZIP includes current generation logic.
-
-1. Extract it to a new folder inside this project, such as `build/package-test`.
-2. From that extracted folder, run the command below. It validates the manifest
-   and game build, then writes `prepared` inside the package.
-3. Make a separate, unmodified game copy inside the project, omitting `save`,
-   and back up that copy's `js/plugins.js`.
+1. Download the ZIP and extract it into a new writable folder. When working from
+   this repository, use a project-local folder such as `.local/package-test`.
+2. With Python 3.10 or newer installed, open PowerShell in that extracted folder
+   and run the command below. It validates the manifest and game build, then
+   writes `prepared` inside the extracted package.
+3. Make a separate, unmodified game copy for testing, omitting `save`, and back
+   up that copy's `js/plugins.js`. Keep it inside the project for repository work.
 4. Copy `prepared/js` contents into the test game's `js` directory. This replaces
    `plugins.js` and adds `plugins/LookOutsideArchipelago.js`.
-5. Put the package's `lookoutside.apworld` in the project-local AP copy's
-   `custom_worlds` folder, restart AP, then follow generation/hosting/connection
-   steps above, using the new test game's path.
+5. Put the package's `lookoutside.apworld` in your test Archipelago copy's
+   `custom_worlds` folder and restart AP. Use the included `LookOutside.yaml`
+   for generation, then follow the extracted README's **Generate and host** and
+   **Play** sections. Launch the test game with `LOA_DEV_MODE=1`, start a fresh
+   Normal save, and connect before collecting randomized rewards.
 
 ```powershell
 $gameSource = Read-Host 'Path to your Look Outside installation'
@@ -397,6 +405,21 @@ It refuses a source already containing this mod or an existing output directory.
 For removal, close the test game, restore its original `js/plugins.js`, and remove
 only `js/plugins/LookOutsideArchipelago.js`. Keep AP saves separate. See the
 [package setup guide](docs/package_setup.md).
+
+### Rebuild the release ZIP from source
+
+Run from the repository root:
+
+```powershell
+$gameSource = Read-Host 'Path to your Look Outside installation'
+python -B tools/build_package.py --game-dir "$gameSource"
+```
+
+The builder validates the registry, native chronology signatures, plugin, and
+shipped guide summaries, then writes `releases/LookOutsideAP-<version>-dev<registry>.zip`.
+This folder is included in Git. Rebuild after source changes and include the
+updated ZIP with the release changes. Its manifest records component hashes;
+the filename alone does not identify every source revision.
 
 ## Saves, updating, and troubleshooting
 

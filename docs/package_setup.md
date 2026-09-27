@@ -10,6 +10,19 @@ versions are rejected with an error before gameplay resumes. Keep the original
 matching mod/game version to finish an older run, or start a new save and seed.
 See `docs/save_compatibility.md`.
 
+## Package contents and requirements
+
+This ZIP includes the built `lookoutside.apworld`, game plugin
+`LookOutsideArchipelago.js`, `prepare_mod.py`, sample `LookOutside.yaml`,
+`manifest.json` with component checksums, `LICENSE`, and setup/playtest docs.
+All mod-specific files needed to prepare and install it are included; no source
+checkout or APWorld build step is required.
+
+Provide your own matching Look Outside installation, Archipelago installation,
+and Python 3.10 or newer. The preparation script uses only Python's standard
+library and builds the replacement game plugin list from your installed copy.
+Keep the original game read-only and install into a separate test copy.
+
 ## Prepare the mod
 
 1. Extract this package into a writable folder. Install Python 3.10 or newer

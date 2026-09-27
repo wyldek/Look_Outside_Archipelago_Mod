@@ -1,4 +1,4 @@
-"""Build a development mod bundle containing no game assets or test instrumentation."""
+"""Build a distributable ZIP in releases, without game assets or test instrumentation."""
 
 import argparse
 import hashlib
@@ -49,13 +49,16 @@ def main():
     files = {"lookoutside.apworld": zip_bytes(world_files), "LookOutsideArchipelago.js": plugin,
              "prepare_mod.py": (PROJECT / "tools" / "prepare_mod.py").read_bytes(),
              "README.md": (PROJECT / "docs" / "package_setup.md").read_bytes(),
+             "LICENSE": (PROJECT / "LICENSE").read_bytes(),
              "LookOutside.yaml": (PROJECT / "tests" / "fixtures" / "lookoutside.yaml").read_bytes()}
     for name in ("access_logic.md", "calendar_deadlines.md", "quest_resolution_policy.md",
                  "ending_release.md", "playtest.md", "current_status.md", "late_reward_audit.md",
                  "save_compatibility.md"):
         files["docs/" + name] = (PROJECT / "docs" / name).read_bytes()
-    version = f"0.0.1-dev{registry['registry_version']}"
+    world_manifest = json.loads((WORLD / "archipelago.json").read_text(encoding="utf-8"))
+    version = f"{world_manifest['world_version']}-dev{registry['registry_version']}"
     manifest = {"package_version": version, "development": True,
+                "world_version": world_manifest["world_version"],
                 "registry_version": registry["registry_version"],
                 "audited_game_id": registry["audited_game_id"],
                 "audited_version_id": registry["audited_version_id"],
@@ -63,7 +66,7 @@ def main():
                 "quest_families": len(registry["quest_families"]),
                 "sha256": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}}
     files["manifest.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
-    target = PROJECT / "build" / "packages" / f"LookOutsideAP-{version}.zip"
+    target = PROJECT / "releases" / f"LookOutsideAP-{version}.zip"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(zip_bytes(files))
     print(json.dumps({"package": str(target), "bytes": target.stat().st_size,
