@@ -18,7 +18,11 @@ native deadlines, corrected Day3/Day8 openings, and conservative quest waits.
 - **30 Simple Keys** and **two Black Keys** delivered through the reviewed bundles.
 - Vanilla quest dates/new-day waits, a 4 a.m. hold, and the Day15 home-door fallback.
   Any real ending on any day completes the goal and requests remaining-check release.
-- **55 Python tests and 44 Node tests pass**. Registry signatures and plugin sync pass.
+- **55 Python tests and 45 Node tests pass**. Registry signatures and plugin sync pass.
+- Opening plain WebSocket failures retry TLS for hosted rooms. Successful secure
+  reconnects retain TLS; explicit secure requests never downgrade. A live
+  transport probe reached RoomInfo without authenticating a slot. The original
+  `0.0.2-dev74` tagged plugin needs an explicit `wss://host:port` address.
 - **15 native chronology scenarios** and **10 real AP CollectionState cases**
   verify boundaries, earlier entrance paths and locked/addressless event handling.
   AP rejects forced direct and transitive late-Rose placements. Runtime day

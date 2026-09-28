@@ -1,9 +1,23 @@
 # Connection and item feedback
 
 The development game menu opens one Archipelago dialog for both Connect and
-Status. It accepts a server address with or without `ws://`, a slot name, and
-an optional masked password. Server and slot are remembered in the local NW.js
+Status. It accepts a server address with or without `ws://` or `wss://`, a slot
+name, and an optional masked password. Server and slot are remembered in the local NW.js
 profile. The password is never written to preferences or the AP save field.
+
+Bare addresses initially use `ws://`. If that transport fails before opening
+or receiving a message, the plugin tries `wss://` on the same host/port. This
+supports hosted rooms requiring TLS, as in
+[Archipelago's standard client](https://github.com/ArchipelagoMW/Archipelago/blob/0.6.7/CommonClient.py#L801-L805).
+An explicit `wss://` address and an opened secure connection never retry in
+plaintext. AP authentication/protocol errors also never trigger transport changes.
+If both opening attempts fail, normal reconnect backoff restarts the original
+request, allowing a temporarily offline plain server to recover.
+
+The successful address, including the secure scheme after fallback, is remembered
+for later connections. Status displays the current address; failed connections
+identify the attempted host/port. In the original `0.0.2-dev74` tagged package,
+automatic secure retry is absent: enter `wss://host:port` explicitly for TLS rooms.
 
 Connection state, errors, seed binding, check count, queued items, and calendar
 hold are shown in the dialog. Disconnect cancels automatic retries while
@@ -37,3 +51,8 @@ offline disconnect, Escape, day cancellation/confirmation with a deadline list,
 the deadline's noon warning, and new-game cleanup.
 These are simulated server interactions; the separate protocol smoke test uses
 a real local Archipelago server.
+
+The plugin regression suite also verifies secure retry, identity/item replay,
+secure reconnects, recovery of offline plain servers, cancellation, and rejection
+paths. A live transport probe confirmed ws failure followed by wss RoomInfo on
+a hosted room, suppressing Connect so no slot, checks, or chat were affected.

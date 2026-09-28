@@ -475,6 +475,117 @@ test("Credits completes a bound seed on any day, excluding cheat mode", () => {
     }
 });
 
+test("WebSocket opening failures retry TLS without changing AP identity or downgrading", () => {
+    class Socket {
+        static instances = [];
+        constructor(url) {
+            this.url = url;
+            this.readyState = 0;
+            this.sent = [];
+            Socket.instances.push(this);
+        }
+        open() { this.readyState = 1; this.onopen?.(); }
+        send(payload) { this.sent.push(...JSON.parse(payload)); }
+        close() { this.readyState = 3; this.onclose?.(); }
+        error() { this.onerror?.(); }
+        server(...packets) { this.onmessage({ data: JSON.stringify(packets) }); }
+    }
+    const options = { url: "ws://example.invalid:38281", name: "TLS Test", uuid: "tls-test",
+        password: "fixture-password", WebSocketClass: Socket, autoReconnect: false };
+    DataManager.setupNewGame();
+    plugin.connectForDevelopment(options);
+    const plain = Socket.instances.at(-1);
+    plain.error();
+    const secure = Socket.instances.at(-1);
+    assert.notEqual(secure, plain);
+    assert.equal(secure.url, "wss://example.invalid:38281");
+    assert.equal(plugin.connectionState, "connecting");
+    assert.equal(plugin.identity(), null);
+    assert.deepEqual(plain.sent, []);
+    secure.open();
+    secure.server({ cmd: "RoomInfo", seed_name: "tls-seed" });
+    assert.equal(secure.sent[0].password, options.password);
+    assert.equal(secure.sent[0].name, options.name);
+    assert.equal(secure.sent[0].uuid, options.uuid);
+    secure.server({ cmd: "Connected", team: 0, slot: 1, checked_locations: [], slot_data: sliceSlotData });
+    secure.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 540100015 }] });
+    assert.equal(plugin.connectionState, "connected");
+    assert.deepEqual(plugin.identity(), { seedName: "tls-seed", team: 0, slot: 1 });
+    assert.equal(plugin.nextItemIndex, 1);
+
+    // Transport fallback during a bound reconnect keeps seed and item history.
+    plugin.connectForDevelopment(options);
+    Socket.instances.at(-1).error();
+    const boundRetry = Socket.instances.at(-1);
+    boundRetry.open();
+    boundRetry.server({ cmd: "RoomInfo", seed_name: "tls-seed" });
+    boundRetry.server({ cmd: "Connected", team: 0, slot: 1, checked_locations: [], slot_data: sliceSlotData });
+    boundRetry.server({ cmd: "ReceivedItems", index: 0, items: [{ item: 540100015 }] });
+    assert.equal(plugin.nextItemIndex, 1);
+    assert.equal(plugin.pendingItems().length, 1);
+
+    // Reconnects retain the successful secure URL rather than cycling protocols.
+    const scheduled = [];
+    DataManager.setupNewGame();
+    plugin.connectForDevelopment({ ...options, autoReconnect: true,
+        setTimeout(callback) { scheduled.push(callback); return scheduled.length; }, clearTimeout() {} });
+    Socket.instances.at(-1).error();
+    Socket.instances.at(-1).open();
+    Socket.instances.at(-1).close();
+    scheduled.at(-1)();
+    assert.equal(Socket.instances.at(-1).url, "wss://example.invalid:38281");
+
+    // A plain server temporarily offline can recover on its original transport
+    // when both opening attempts fail; explicit TLS is never downgraded.
+    DataManager.setupNewGame();
+    plugin.connectForDevelopment({ ...options, autoReconnect: true,
+        setTimeout(callback) { scheduled.push(callback); return scheduled.length; }, clearTimeout() {} });
+    Socket.instances.at(-1).error();
+    Socket.instances.at(-1).error();
+    const countWhileOffline = Socket.instances.length;
+    assert.equal(plugin.connectionState, "disconnected");
+    scheduled.at(-1)();
+    assert.equal(Socket.instances.length, countWhileOffline + 1);
+    const recoveredPlain = Socket.instances.at(-1);
+    assert.equal(recoveredPlain.url, options.url);
+    recoveredPlain.open();
+    recoveredPlain.server({ cmd: "RoomInfo", seed_name: "plain-recovered" });
+    recoveredPlain.server({ cmd: "Connected", team: 0, slot: 1, checked_locations: [], slot_data: sliceSlotData });
+    assert.equal(plugin.connectionState, "connected");
+
+    DataManager.setupNewGame();
+    plugin.connectForDevelopment({ ...options, url: "wss://example.invalid:38281" });
+    const countBeforeFailure = Socket.instances.length;
+    Socket.instances.at(-1).error();
+    assert.equal(Socket.instances.length, countBeforeFailure, "TLS failure must not downgrade to ws");
+    assert.match(plugin.connectionError, /wss:\/\/example.invalid:38281/);
+
+    // An opened transport, malformed AP data, or authentication rejection is
+    // not a TLS handshake problem and must never launch a secure retry.
+    for (const failure of [
+        socket => { socket.open(); socket.error(); },
+        socket => socket.onmessage({ data: "not JSON" }),
+        socket => { socket.open(); socket.server({ cmd: "RoomInfo", seed_name: "tls-seed" });
+            socket.server({ cmd: "ConnectionRefused", errors: ["InvalidPassword"] }); },
+    ]) {
+        DataManager.setupNewGame();
+        plugin.connectForDevelopment(options);
+        const count = Socket.instances.length;
+        failure(Socket.instances.at(-1));
+        assert.equal(Socket.instances.length, count);
+    }
+
+    // A late error from a cancelled connection cannot start another socket.
+    DataManager.setupNewGame();
+    plugin.connectForDevelopment(options);
+    const cancelled = Socket.instances.at(-1);
+    DataManager.setupNewGame();
+    const countAfterReset = Socket.instances.length;
+    cancelled.error();
+    assert.equal(Socket.instances.length, countAfterReset);
+    assert.equal(plugin.connectionState, "disconnected");
+});
+
 test("WebSocket handshake replays offline checks and rejects another seed", () => {
     class FakeWebSocket {
         static instances = [];

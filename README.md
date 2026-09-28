@@ -361,6 +361,9 @@ Set-Location "$projectRoot\.local\game-smoke"
 3. Enter `localhost:38281` for the local server, the exact YAML player name
    (`LookOutside_Test` in the sample), and a room password if required.
    Explicit `ws://` and `wss://` addresses are supported.
+   Hosted rooms requiring encryption can be entered as `wss://host:port`.
+   Current source also retries a failed opening `ws://` connection securely;
+   the original `0.0.2-dev74` tagged package requires the explicit secure scheme.
 4. Confirm the bound seed/slot in **Archipelago Status**, then play and save in
    the test copy. Server/slot settings are remembered; passwords are masked and
    are not saved.
@@ -443,7 +446,7 @@ compatibility before native AP save state is installed. See
 
 ## Verification and developer references
 
-The recorded checkpoint has **55 Python tests and 44 Node tests passing**, plus
+The recorded checkpoint has **55 Python tests and 45 Node tests passing**, plus
 targeted native event probes. Chronology verification includes 77 native source
 signatures, 15 native scenarios, and 10 real AP CollectionState cases. AP 0.6.7
 seed 172 reaches all 273 locations; two-player seed 173 reaches all 546 locations

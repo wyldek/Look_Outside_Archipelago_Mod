@@ -8898,6 +8898,7 @@
             : "Save is not bound to an AP seed";
         return [
             `Archipelago: ${connectionState}`,
+            `Server: ${connection?.url || lastServerUrl}`,
             bound,
             `Checks: ${checkedKeys.size} / ${Object.keys(developmentLocationIds).length}; pending items: ${pendingItems.length}`,
             dayHold ? `Day ${globalThis.$gameVariables?.value(15)} is held` : "Day is not held",
@@ -8995,6 +8996,14 @@
         connectionError = null;
         socket?.close();
         // A bound save keeps collecting checks and queued deliveries offline.
+    }
+
+    function rememberConnection(url, name) {
+        lastServerUrl = url;
+        lastSlotName = name;
+        try {
+            globalThis.localStorage?.setItem("lookOutsideArchipelagoConnection", JSON.stringify({ url, name }));
+        } catch (_) { /* Connection works without persistent preferences. */ }
     }
 
     function showMenuDialog(scene, advance = false) {
@@ -9132,11 +9141,7 @@
                 if (!url.includes("://")) url = `ws://${url}`;
                 const name = fields.name.value.trim();
                 connectForDevelopment({ url, name, password: fields.password.value, uuid: connectionUuid() });
-                lastServerUrl = url;
-                lastSlotName = name;
-                try {
-                    globalThis.localStorage?.setItem("lookOutsideArchipelagoConnection", JSON.stringify({ url, name }));
-                } catch (_) { /* Connection works without persistent preferences. */ }
+                rememberConnection(url, name);
                 fields.password.value = "";
             } catch (failure) {
                 error.textContent = failure.message;
@@ -9285,7 +9290,7 @@
         itemDefinitions = definitions;
     }
 
-    function connectForDevelopment(options, isRetry = false) {
+    function connectForDevelopment(options, isRetry = false, plainRetryOptions = null) {
         requireNormalMode();
         if (saveError) throw new Error(saveError);
         requireFirstBindingEligibility();
@@ -9318,6 +9323,9 @@
         let roomSeedName = null;
         const serverCheckedIds = new Set();
         const socket = new WebSocketClass(options.url);
+        let socketOpened = false;
+        let receivedMessage = false;
+        let transportFailed = false;
         connectionGeneration++;
         cancelReconnect();
         const oldConnection = connection;
@@ -9332,7 +9340,7 @@
         serverReleasePermission = null;
         serverMissingChecks = null;
 
-        function scheduleReconnect() {
+        function scheduleReconnect(retryOptions = options) {
             if (options.autoReconnect === false) return;
             const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempt, 5), 30000);
             reconnectAttempt++;
@@ -9340,7 +9348,7 @@
             const clear = options.clearTimeout || globalThis.clearTimeout;
             const id = schedule(() => {
                 reconnectTimer = null;
-                if (generation === connectionGeneration) connectForDevelopment(options, true);
+                if (generation === connectionGeneration) connectForDevelopment(retryOptions, true);
             }, delay);
             reconnectTimer = { id, clear };
         }
@@ -9378,8 +9386,12 @@
             goalReporter = null;
             socket.close();
         }
+        socket.onopen = () => {
+            if (socket === connection) socketOpened = true;
+        };
         socket.onmessage = event => {
             if (socket !== connection || connectionState === "error") return;
+            receivedMessage = true;
             let packets;
             try {
                 packets = JSON.parse(event.data);
@@ -9428,6 +9440,7 @@
                         acceptServerChecks(packet.checked_locations || []);
                         connectionState = "connected";
                         connectionError = null;
+                        rememberConnection(options.url, options.name);
                         reconnectAttempt = 0;
                         active = true;
                         globalThis.$gameMap?.requestRefresh();
@@ -9466,18 +9479,38 @@
         };
         socket.onerror = () => {
             if (socket === connection && connectionState !== "error") {
-                connectionError = "WebSocket error";
+                transportFailed = true;
+                connectionError = `WebSocket connection failed (${serverUrl.protocol}//${serverUrl.host}). Check the server address/port and that the room is running.`;
                 socket.close();
             }
         };
         socket.onclose = () => {
             if (socket === connection) {
-                if (connectionState !== "error") {
-                    connectionState = "disconnected";
-                    scheduleReconnect();
-                }
                 goalReporter = null;
                 connection = null;
+                // Hosted AP rooms may require TLS. Chromium exposes opening
+                // failures as opaque error events, so try the secure transport
+                // once before normal reconnects. Never downgrade TLS, or retry
+                // an AP rejection/protocol error using a different transport.
+                if (connectionState !== "error" && transportFailed &&
+                    !socketOpened && !receivedMessage && serverUrl.protocol === "ws:") {
+                    try {
+                        connectForDevelopment({ ...options, url: options.url.replace(/^ws:/, "wss:") }, true, options);
+                    } catch (error) {
+                        connectionState = "error";
+                        connectionError = `Secure WebSocket retry failed: ${error.message}`;
+                    }
+                    return;
+                }
+                if (connectionState !== "error") {
+                    connectionState = "disconnected";
+                    // If neither handshake opened, retry the originally
+                    // requested transport after backoff. Once TLS opens, all
+                    // subsequent reconnects retain it. Explicit wss requests
+                    // never have a plain transport to fall back to.
+                    scheduleReconnect(!socketOpened && !receivedMessage && plainRetryOptions
+                        ? plainRetryOptions : options);
+                }
             }
         };
     }
